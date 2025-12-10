@@ -1842,7 +1842,7 @@ export function SettingsView() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto space-y-6 py-4">
+          <div className="flex-1 overflow-y-auto space-y-6 py-4 pl-3 pr-6 pb-6">
             {/* Visual Keyboard Map */}
             <KeyboardMap />
 
@@ -1854,15 +1854,6 @@ export function SettingsView() {
               <ShortcutReferencePanel editable />
             </div>
           </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowKeyboardMapDialog(false)}
-            >
-              Close
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

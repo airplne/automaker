@@ -17,9 +17,13 @@ import { useSetupStore } from "@/store/setup-store";
 import { getElectronAPI, isElectron } from "@/lib/electron";
 
 export default function Home() {
-  const { currentView, setCurrentView, setIpcConnected, theme } = useAppStore();
+  const { currentView, setCurrentView, setIpcConnected, theme, currentProject } = useAppStore();
   const { isFirstRun, setupComplete } = useSetupStore();
   const [isMounted, setIsMounted] = useState(false);
+
+  // Compute the effective theme: project theme takes priority over global theme
+  // This is reactive because it depends on currentProject and theme from the store
+  const effectiveTheme = currentProject?.theme || theme;
 
   // Prevent hydration issues
   useEffect(() => {
@@ -60,7 +64,7 @@ export default function Home() {
     testConnection();
   }, [setIpcConnected]);
 
-  // Apply theme class to document
+  // Apply theme class to document (uses effective theme - project-specific or global)
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove(
@@ -78,31 +82,31 @@ export default function Home() {
       "synthwave"
     );
 
-    if (theme === "dark") {
+    if (effectiveTheme === "dark") {
       root.classList.add("dark");
-    } else if (theme === "retro") {
+    } else if (effectiveTheme === "retro") {
       root.classList.add("retro");
-    } else if (theme === "dracula") {
+    } else if (effectiveTheme === "dracula") {
       root.classList.add("dracula");
-    } else if (theme === "nord") {
+    } else if (effectiveTheme === "nord") {
       root.classList.add("nord");
-    } else if (theme === "monokai") {
+    } else if (effectiveTheme === "monokai") {
       root.classList.add("monokai");
-    } else if (theme === "tokyonight") {
+    } else if (effectiveTheme === "tokyonight") {
       root.classList.add("tokyonight");
-    } else if (theme === "solarized") {
+    } else if (effectiveTheme === "solarized") {
       root.classList.add("solarized");
-    } else if (theme === "gruvbox") {
+    } else if (effectiveTheme === "gruvbox") {
       root.classList.add("gruvbox");
-    } else if (theme === "catppuccin") {
+    } else if (effectiveTheme === "catppuccin") {
       root.classList.add("catppuccin");
-    } else if (theme === "onedark") {
+    } else if (effectiveTheme === "onedark") {
       root.classList.add("onedark");
-    } else if (theme === "synthwave") {
+    } else if (effectiveTheme === "synthwave") {
       root.classList.add("synthwave");
-    } else if (theme === "light") {
+    } else if (effectiveTheme === "light") {
       root.classList.add("light");
-    } else if (theme === "system") {
+    } else if (effectiveTheme === "system") {
       // System theme
       const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       if (isDark) {
@@ -111,7 +115,7 @@ export default function Home() {
         root.classList.add("light");
       }
     }
-  }, [theme]);
+  }, [effectiveTheme]);
 
   const renderView = () => {
     switch (currentView) {

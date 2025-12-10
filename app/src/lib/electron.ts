@@ -1574,6 +1574,7 @@ export interface Project {
   name: string;
   path: string;
   lastOpened?: string;
+  theme?: string; // Per-project theme override (uses ThemeMode from app-store)
 }
 
 export interface TrashedProject extends Project {

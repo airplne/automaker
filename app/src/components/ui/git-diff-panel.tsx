@@ -333,7 +333,7 @@ function FileDiffSection({
         </div>
       </button>
       {isExpanded && (
-        <div className="bg-background border-t border-border max-h-[400px] overflow-y-auto">
+        <div className="bg-background border-t border-border max-h-[400px] overflow-y-auto scrollbar-visible">
           {fileDiff.hunks.map((hunk, hunkIndex) => (
             <div key={hunkIndex} className="border-b border-border-glass last:border-b-0">
               {hunk.lines.map((line, lineIndex) => (
@@ -466,7 +466,7 @@ export function GitDiffPanel({
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-4 py-3 flex items-center justify-between bg-card hover:bg-accent/50 transition-colors text-left"
+        className="w-full px-4 py-3 flex items-center justify-between bg-card hover:bg-accent/50 transition-colors text-left flex-shrink-0"
         data-testid="git-diff-panel-toggle"
       >
         <div className="flex items-center gap-2">
@@ -522,94 +522,96 @@ export function GitDiffPanel({
               <span className="text-sm">No changes detected</span>
             </div>
           ) : (
-            <div className="p-4 space-y-4">
+            <div>
               {/* Summary bar */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4 flex-wrap">
-                  {(() => {
-                    // Group files by status
-                    const statusGroups = files.reduce((acc, file) => {
-                      const status = file.status;
-                      if (!acc[status]) {
-                        acc[status] = {
-                          count: 0,
-                          statusText: getStatusDisplayName(status),
-                          files: []
-                        };
-                      }
-                      acc[status].count += 1;
-                      acc[status].files.push(file.path);
-                      return acc;
-                    }, {} as Record<string, {count: number, statusText: string, files: string[]}>);
+              <div className="p-4 pb-2 border-b border-border-glass">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    {(() => {
+                      // Group files by status
+                      const statusGroups = files.reduce((acc, file) => {
+                        const status = file.status;
+                        if (!acc[status]) {
+                          acc[status] = {
+                            count: 0,
+                            statusText: getStatusDisplayName(status),
+                            files: []
+                          };
+                        }
+                        acc[status].count += 1;
+                        acc[status].files.push(file.path);
+                        return acc;
+                      }, {} as Record<string, {count: number, statusText: string, files: string[]}>);
 
-                    return Object.entries(statusGroups).map(([status, group]) => (
-                      <div
-                        key={status}
-                        className="flex items-center gap-1.5"
-                        title={group.files.join('\n')}
-                        data-testid={`git-status-group-${status.toLowerCase()}`}
-                      >
-                        {getFileIcon(status)}
-                        <span
-                          className={cn(
-                            "text-xs px-1.5 py-0.5 rounded border font-medium",
-                            getStatusBadgeColor(status)
-                          )}
+                      return Object.entries(statusGroups).map(([status, group]) => (
+                        <div
+                          key={status}
+                          className="flex items-center gap-1.5"
+                          title={group.files.join('\n')}
+                          data-testid={`git-status-group-${status.toLowerCase()}`}
                         >
-                          {group.count} {group.statusText}
-                        </span>
-                      </div>
-                    ));
-                  })()}
+                          {getFileIcon(status)}
+                          <span
+                            className={cn(
+                              "text-xs px-1.5 py-0.5 rounded border font-medium",
+                              getStatusBadgeColor(status)
+                            )}
+                          >
+                            {group.count} {group.statusText}
+                          </span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={expandAllFiles}
+                      className="text-xs h-7"
+                    >
+                      Expand All
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={collapseAllFiles}
+                      className="text-xs h-7"
+                    >
+                      Collapse All
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={loadDiffs}
+                      className="text-xs h-7"
+                    >
+                      <RefreshCw className="w-3 h-3 mr-1" />
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={expandAllFiles}
-                    className="text-xs h-7"
-                  >
-                    Expand All
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={collapseAllFiles}
-                    className="text-xs h-7"
-                  >
-                    Collapse All
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={loadDiffs}
-                    className="text-xs h-7"
-                  >
-                    <RefreshCw className="w-3 h-3 mr-1" />
-                    Refresh
-                  </Button>
-                </div>
-              </div>
 
-              {/* Stats */}
-              <div className="flex items-center gap-4 text-sm">
-                <span className="text-muted-foreground">
-                  {files.length} {files.length === 1 ? "file" : "files"} changed
-                </span>
-                {totalAdditions > 0 && (
-                  <span className="text-green-400">
-                    +{totalAdditions} additions
+                {/* Stats */}
+                <div className="flex items-center gap-4 text-sm mt-2">
+                  <span className="text-muted-foreground">
+                    {files.length} {files.length === 1 ? "file" : "files"} changed
                   </span>
-                )}
-                {totalDeletions > 0 && (
-                  <span className="text-red-400">
-                    -{totalDeletions} deletions
-                  </span>
-                )}
+                  {totalAdditions > 0 && (
+                    <span className="text-green-400">
+                      +{totalAdditions} additions
+                    </span>
+                  )}
+                  {totalDeletions > 0 && (
+                    <span className="text-red-400">
+                      -{totalDeletions} deletions
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* File diffs */}
-              <div className="space-y-3">
+              <div className="p-4 space-y-3">
                 {parsedDiffs.map((fileDiff) => (
                   <FileDiffSection
                     key={fileDiff.filePath}

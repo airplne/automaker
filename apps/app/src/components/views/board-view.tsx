@@ -1154,7 +1154,17 @@ export function BoardView() {
         open={showCreatePRDialog}
         onOpenChange={setShowCreatePRDialog}
         worktree={selectedWorktreeForAction}
-        onCreated={() => {
+        onCreated={(prUrl) => {
+          // If a PR was created and we have the worktree branch, update all features on that branch with the PR URL
+          if (prUrl && selectedWorktreeForAction?.branch) {
+            const branchName = selectedWorktreeForAction.branch;
+            hookFeatures
+              .filter((f) => f.branchName === branchName)
+              .forEach((feature) => {
+                updateFeature(feature.id, { prUrl });
+                persistFeatureUpdate(feature.id, { prUrl });
+              });
+          }
           setWorktreeRefreshKey((k) => k + 1);
           setSelectedWorktreeForAction(null);
         }}

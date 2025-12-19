@@ -2610,4 +2610,127 @@ test.describe("Worktree Integration Tests", () => {
     // worktreePath should not exist in the feature data (worktrees are created at execution time)
     expect(featureData.worktreePath).toBeUndefined();
   });
+
+  // ==========================================================================
+  // PR URL Tracking Tests
+  // ==========================================================================
+
+  test("feature should support prUrl field for tracking pull request URLs", async ({
+    page,
+  }) => {
+    await setupProjectWithPath(page, testRepo.path);
+    await page.goto("/");
+    await waitForNetworkIdle(page);
+    await waitForBoardView(page);
+
+    // Create a feature
+    await clickAddFeature(page);
+    await fillAddFeatureDialog(page, "Feature for PR URL test", {
+      category: "Testing",
+    });
+    await confirmAddFeature(page);
+    await page.waitForTimeout(1000);
+
+    // Verify feature was created
+    const featuresDir = path.join(testRepo.path, ".automaker", "features");
+    const featureDirs = fs.readdirSync(featuresDir);
+    const featureDir = featureDirs.find((dir) => {
+      const featureFilePath = path.join(featuresDir, dir, "feature.json");
+      if (fs.existsSync(featureFilePath)) {
+        const data = JSON.parse(fs.readFileSync(featureFilePath, "utf-8"));
+        return data.description === "Feature for PR URL test";
+      }
+      return false;
+    });
+    expect(featureDir).toBeDefined();
+
+    // Manually update the feature.json file to add prUrl (simulating what happens after PR creation)
+    const featureFilePath = path.join(featuresDir, featureDir!, "feature.json");
+    const featureData = JSON.parse(fs.readFileSync(featureFilePath, "utf-8"));
+    featureData.prUrl = "https://github.com/test/repo/pull/123";
+    fs.writeFileSync(featureFilePath, JSON.stringify(featureData, null, 2));
+
+    // Reload the page to pick up the change
+    await page.reload();
+    await waitForNetworkIdle(page);
+    await waitForBoardView(page);
+    await page.waitForTimeout(1000);
+
+    // Verify the PR URL link is displayed on the card
+    const prUrlLink = page.locator(`[data-testid="pr-url-${featureData.id}"]`);
+    await expect(prUrlLink).toBeVisible({ timeout: 5000 });
+    await expect(prUrlLink).toHaveText(/Pull Request/);
+    await expect(prUrlLink).toHaveAttribute(
+      "href",
+      "https://github.com/test/repo/pull/123"
+    );
+  });
+
+  test("prUrl should persist when updating feature", async ({ page }) => {
+    await setupProjectWithPath(page, testRepo.path);
+    await page.goto("/");
+    await waitForNetworkIdle(page);
+    await waitForBoardView(page);
+
+    // Create a feature
+    await clickAddFeature(page);
+    await fillAddFeatureDialog(page, "Feature with PR URL persistence", {
+      category: "Testing",
+    });
+    await confirmAddFeature(page);
+    await page.waitForTimeout(1000);
+
+    // Find the feature file
+    const featuresDir = path.join(testRepo.path, ".automaker", "features");
+    const featureDirs = fs.readdirSync(featuresDir);
+    const featureDir = featureDirs.find((dir) => {
+      const featureFilePath = path.join(featuresDir, dir, "feature.json");
+      if (fs.existsSync(featureFilePath)) {
+        const data = JSON.parse(fs.readFileSync(featureFilePath, "utf-8"));
+        return data.description === "Feature with PR URL persistence";
+      }
+      return false;
+    });
+    expect(featureDir).toBeDefined();
+
+    // Add prUrl to the feature
+    const featureFilePath = path.join(featuresDir, featureDir!, "feature.json");
+    let featureData = JSON.parse(fs.readFileSync(featureFilePath, "utf-8"));
+    const originalPrUrl = "https://github.com/test/repo/pull/456";
+    featureData.prUrl = originalPrUrl;
+    fs.writeFileSync(featureFilePath, JSON.stringify(featureData, null, 2));
+
+    // Reload the page
+    await page.reload();
+    await waitForNetworkIdle(page);
+    await waitForBoardView(page);
+    await page.waitForTimeout(1000);
+
+    // Open edit dialog by double-clicking the feature card
+    const featureCard = page.getByText("Feature with PR URL persistence");
+    await featureCard.dblclick();
+    await page.waitForTimeout(500);
+
+    // Wait for edit dialog to open
+    const editDialog = page.locator('[data-testid="edit-feature-dialog"]');
+    await expect(editDialog).toBeVisible({ timeout: 5000 });
+
+    // Update the description
+    const descInput = page.locator(
+      '[data-testid="edit-feature-description"] textarea'
+    );
+    await descInput.fill("Feature with PR URL persistence - updated");
+
+    // Save the feature
+    const saveButton = page.locator('[data-testid="confirm-edit-feature"]');
+    await saveButton.click();
+    await page.waitForTimeout(1000);
+
+    // Verify prUrl was preserved
+    featureData = JSON.parse(fs.readFileSync(featureFilePath, "utf-8"));
+    expect(featureData.prUrl).toBe(originalPrUrl);
+    expect(featureData.description).toBe(
+      "Feature with PR URL persistence - updated"
+    );
+  });
 });

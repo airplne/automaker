@@ -30,7 +30,7 @@ interface CreatePRDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   worktree: WorktreeInfo | null;
-  onCreated: () => void;
+  onCreated: (prUrl?: string) => void;
 }
 
 export function CreatePRDialog({
@@ -201,7 +201,8 @@ export function CreatePRDialog({
     // Only call onCreated() if an actual operation completed
     // This prevents unnecessary refreshes when user cancels
     if (operationCompletedRef.current) {
-      onCreated();
+      // Pass the PR URL if one was created
+      onCreated(prUrl || undefined);
     }
     onOpenChange(false);
     // State reset is handled by useEffect when open becomes false

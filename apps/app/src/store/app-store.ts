@@ -305,6 +305,7 @@ export interface Feature {
   planningMode?: PlanningMode; // Planning mode for this feature
   planSpec?: PlanSpec; // Generated spec/plan data
   requirePlanApproval?: boolean; // Whether to pause and require manual approval before implementation
+  prUrl?: string; // Pull request URL when a PR has been created for this feature
 }
 
 // Parsed task from spec (for spec and full planning modes)

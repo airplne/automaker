@@ -36,9 +36,12 @@ export interface ExecuteOptions {
   model: string;
   cwd: string;
   systemPrompt?: string | SystemPromptPreset;
+  maxThinkingTokens?: number;
+  outputFormat?: { type: 'json_schema'; schema: Record<string, unknown> };
   maxTurns?: number;
   allowedTools?: string[];
   mcpServers?: Record<string, unknown>;
+  hooks?: Record<string, unknown>;
   abortController?: AbortController;
   conversationHistory?: ConversationMessage[]; // Previous messages for context
   sdkSessionId?: string; // Claude SDK session ID for resuming conversations

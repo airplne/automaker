@@ -9,6 +9,8 @@ import {
   FlaskConical,
   Trash2,
   Sparkles,
+  Puzzle,
+  Shield,
 } from 'lucide-react';
 import type { SettingsViewId } from '../hooks/use-settings-view';
 
@@ -22,11 +24,13 @@ export interface NavigationItem {
 export const NAV_ITEMS: NavigationItem[] = [
   { id: 'api-keys', label: 'API Keys', icon: Key },
   { id: 'claude', label: 'Claude', icon: Terminal },
+  { id: 'bmad', label: 'BMAD', icon: Puzzle },
   { id: 'ai-enhancement', label: 'AI Enhancement', icon: Sparkles },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'terminal', label: 'Terminal', icon: SquareTerminal },
   { id: 'keyboard', label: 'Keyboard Shortcuts', icon: Settings2 },
   { id: 'audio', label: 'Audio', icon: Volume2 },
   { id: 'defaults', label: 'Feature Defaults', icon: FlaskConical },
+  { id: 'npm-security', label: 'npm Security', icon: Shield },
   { id: 'danger', label: 'Danger Zone', icon: Trash2 },
 ];

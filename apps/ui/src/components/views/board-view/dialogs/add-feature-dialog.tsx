@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,16 +13,25 @@ import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CategoryAutocomplete } from '@/components/ui/category-autocomplete';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DescriptionImageDropZone,
   FeatureImagePath as DescriptionImagePath,
   FeatureTextFilePath as DescriptionTextFilePath,
   ImagePreviewMap,
 } from '@/components/ui/description-image-dropzone';
-import { MessageSquare, Settings2, SlidersHorizontal, Sparkles, ChevronDown } from 'lucide-react';
+import {
+  MessageSquare,
+  Settings2,
+  SlidersHorizontal,
+  Sparkles,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
-import { modelSupportsThinking } from '@/lib/utils';
+import { modelSupportsThinking, cn } from '@/lib/utils';
+import { useBmadPersonas } from '@/hooks/use-bmad-personas';
 import {
   useAppStore,
   AgentModel,
@@ -68,6 +77,9 @@ interface AddFeatureDialogProps {
     skipTests: boolean;
     model: AgentModel;
     thinkingLevel: ThinkingLevel;
+    aiProfileId?: string | null;
+    personaId?: string | null;
+    agentIds?: string[];
     branchName: string; // Can be empty string to use current branch
     priority: number;
     planningMode: PlanningMode;
@@ -131,6 +143,14 @@ export function AddFeatureDialog({
   >('improve');
   const [planningMode, setPlanningMode] = useState<PlanningMode>('skip');
   const [requirePlanApproval, setRequirePlanApproval] = useState(false);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(null);
+  const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set());
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['triad']));
+
+  const { personas: bmadPersonas, isLoading: isLoadingPersonas } = useBmadPersonas({
+    enabled: open,
+  });
 
   // Spawn mode state
   const [ancestors, setAncestors] = useState<AncestorContext[]>([]);
@@ -161,6 +181,8 @@ export function AddFeatureDialog({
         model: defaultProfile?.model ?? 'opus',
         thinkingLevel: defaultProfile?.thinkingLevel ?? 'none',
       }));
+      setSelectedProfileId(defaultProfile?.id ?? null);
+      setSelectedPersonaId(defaultProfile?.personaId ?? null);
       setUseCurrentBranch(true);
       setPlanningMode(defaultPlanningMode);
       setRequirePlanApproval(defaultRequirePlanApproval);
@@ -245,6 +267,9 @@ export function AddFeatureDialog({
       skipTests: newFeature.skipTests,
       model: selectedModel,
       thinkingLevel: normalizedThinking,
+      aiProfileId: selectedProfileId,
+      personaId: selectedPersonaId,
+      agentIds: selectedAgentIds.size > 0 ? Array.from(selectedAgentIds) : undefined,
       branchName: finalBranchName,
       priority: newFeature.priority,
       planningMode,
@@ -270,6 +295,13 @@ export function AddFeatureDialog({
     setUseCurrentBranch(true);
     setPlanningMode(defaultPlanningMode);
     setRequirePlanApproval(defaultRequirePlanApproval);
+    setSelectedProfileId(defaultAIProfileId ?? null);
+    setSelectedPersonaId(
+      defaultAIProfileId
+        ? (aiProfiles.find((p) => p.id === defaultAIProfileId)?.personaId ?? null)
+        : null
+    );
+    setSelectedAgentIds(new Set());
     setNewFeaturePreviewMap(new Map());
     setShowAdvancedOptions(false);
     setDescriptionError(false);
@@ -313,6 +345,7 @@ export function AddFeatureDialog({
   };
 
   const handleModelSelect = (model: AgentModel) => {
+    setSelectedProfileId(null);
     setNewFeature({
       ...newFeature,
       model,
@@ -320,15 +353,118 @@ export function AddFeatureDialog({
     });
   };
 
-  const handleProfileSelect = (model: AgentModel, thinkingLevel: ThinkingLevel) => {
+  const handleProfileSelect = (profile: AIProfile) => {
+    setSelectedProfileId(profile.id);
+    if (profile.personaId) {
+      setSelectedPersonaId(profile.personaId);
+    }
     setNewFeature({
       ...newFeature,
-      model,
-      thinkingLevel,
+      model: profile.model,
+      thinkingLevel: profile.thinkingLevel,
     });
   };
 
   const newModelAllowsThinking = modelSupportsThinking(newFeature.model);
+
+  // Filter out BMAD profiles (those with personaId) from Quick Select
+  // BMAD personas are now selected on the Prompt tab, not via profiles
+  const modelOnlyProfiles = useMemo(() => aiProfiles.filter((p) => !p.personaId), [aiProfiles]);
+
+  // Multi-select agent toggle function
+  const toggleAgentSelection = (agentId: string) => {
+    setSelectedAgentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(agentId)) {
+        next.delete(agentId);
+      } else if (next.size < 3) {
+        next.add(agentId);
+      }
+      return next;
+    });
+  };
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  };
+
+  // Agent categories - filtered to Triad agents only
+  const agentCategories = useMemo(() => {
+    // Define the Triad agents with proper bmad: prefix
+    const triadAgentIds = [
+      'bmad:strategist-marketer',
+      'bmad:technologist-architect',
+      'bmad:fulfillization-manager',
+    ];
+
+    // Filter bmadPersonas to only include Triad agents
+    const triadAgents = triadAgentIds
+      .map((agentId) => bmadPersonas.find((p) => p.id === agentId))
+      .filter((agent): agent is NonNullable<typeof agent> => agent !== undefined)
+      .map((agent) => ({
+        id: agent.id,
+        label: agent.label,
+        icon: agent.icon ?? '🤖',
+      }));
+
+    // Return a single category for the Triad
+    const filteredCategories: Record<string, { label: string; agents: typeof triadAgents }> = {};
+
+    if (triadAgents.length > 0) {
+      filteredCategories.triad = {
+        label: 'Triad Agents',
+        agents: triadAgents,
+      };
+    }
+
+    return filteredCategories;
+  }, [bmadPersonas]);
+
+  // Agent checkbox item component
+  const AgentCheckboxItem = ({
+    agent,
+    isSelected,
+    isDisabled,
+    onToggle,
+    orderNumber,
+  }: {
+    agent: { id: string; label: string; icon: string };
+    isSelected: boolean;
+    isDisabled: boolean;
+    onToggle: () => void;
+    orderNumber: number;
+  }) => {
+    return (
+      <div
+        className={cn(
+          'flex items-center gap-2 p-2 rounded-md transition-colors cursor-pointer',
+          isSelected ? 'bg-primary/10' : 'hover:bg-muted/50',
+          isDisabled && 'opacity-50 cursor-not-allowed'
+        )}
+        onClick={() => !isDisabled && onToggle()}
+      >
+        <Checkbox
+          checked={isSelected}
+          disabled={isDisabled}
+          onCheckedChange={onToggle}
+          onClick={(e) => e.stopPropagation()}
+        />
+        <span className="text-base">{agent.icon}</span>
+        <span className="text-sm flex-1">{agent.label}</span>
+        {isSelected && orderNumber > 0 && (
+          <span className="text-xs text-muted-foreground">#{orderNumber}</span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleDialogClose}>
@@ -471,6 +607,99 @@ export function AddFeatureDialog({
                 data-testid="feature-category-input"
               />
             </div>
+
+            {/* BMAD Agent Collaboration Selection */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Add Triad Agents to Task</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {selectedAgentIds.size}/3 selected
+                  </span>
+                  {selectedAgentIds.size > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setSelectedAgentIds(new Set())}
+                    >
+                      Clear All
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {isLoadingPersonas ? (
+                <div className="text-sm text-muted-foreground p-4 text-center">
+                  Loading agents...
+                </div>
+              ) : (
+                <div
+                  className="space-y-3 border rounded-md p-3 max-h-[400px] overflow-y-auto"
+                  data-testid="feature-agent-select"
+                >
+                  {Object.entries(agentCategories).map(([categoryKey, category]) => {
+                    const isExpanded = expandedCategories.has(categoryKey);
+                    const selectedInCategory = category.agents.filter((agent) =>
+                      selectedAgentIds.has(agent.id)
+                    ).length;
+
+                    return (
+                      <div key={categoryKey} className="space-y-2">
+                        <div
+                          className="flex items-center justify-between cursor-pointer hover:bg-muted/50 p-1 rounded-md transition-colors"
+                          onClick={() => toggleCategory(categoryKey)}
+                        >
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            )}
+                            <span className="text-sm font-medium">{category.label}</span>
+                            {selectedInCategory > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                ({selectedInCategory})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="space-y-1 ml-6">
+                            {category.agents.map((agent) => {
+                              const isSelected = selectedAgentIds.has(agent.id);
+                              const isDisabled = !isSelected && selectedAgentIds.size >= 3;
+                              const selectedArray = Array.from(selectedAgentIds);
+                              const orderNumber = isSelected
+                                ? selectedArray.indexOf(agent.id) + 1
+                                : 0;
+
+                              return (
+                                <AgentCheckboxItem
+                                  key={agent.id}
+                                  agent={agent}
+                                  isSelected={isSelected}
+                                  isDisabled={isDisabled}
+                                  onToggle={() => toggleAgentSelection(agent.id)}
+                                  orderNumber={orderNumber}
+                                />
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Select up to 3 Triad agents for collaborative execution. Party mode automatically
+                uses all three Triad agents.
+              </p>
+            </div>
+
             {useWorktrees && (
               <BranchSelector
                 useCurrentBranch={useCurrentBranch}
@@ -515,9 +744,10 @@ export function AddFeatureDialog({
               </div>
             )}
 
-            {/* Quick Select Profile Section */}
+            {/* Quick Select Profile Section - filtered to model-only profiles */}
             <ProfileQuickSelect
-              profiles={aiProfiles}
+              profiles={modelOnlyProfiles}
+              selectedProfileId={selectedProfileId}
               selectedModel={newFeature.model}
               selectedThinkingLevel={newFeature.thinkingLevel}
               onSelect={handleProfileSelect}
@@ -529,7 +759,7 @@ export function AddFeatureDialog({
             />
 
             {/* Separator */}
-            {aiProfiles.length > 0 && (!showProfilesOnly || showAdvancedOptions) && (
+            {modelOnlyProfiles.length > 0 && (!showProfilesOnly || showAdvancedOptions) && (
               <div className="border-t border-border" />
             )}
 
@@ -540,9 +770,10 @@ export function AddFeatureDialog({
                 {newModelAllowsThinking && (
                   <ThinkingLevelSelector
                     selectedLevel={newFeature.thinkingLevel}
-                    onLevelSelect={(level) =>
-                      setNewFeature({ ...newFeature, thinkingLevel: level })
-                    }
+                    onLevelSelect={(level) => {
+                      setSelectedProfileId(null);
+                      setNewFeature({ ...newFeature, thinkingLevel: level });
+                    }}
                   />
                 )}
               </>

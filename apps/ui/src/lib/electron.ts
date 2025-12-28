@@ -10,7 +10,10 @@ import type {
   IssueValidationResponse,
   IssueValidationEvent,
   StoredValidation,
+  BacklogPlanEvent,
+  BacklogPlanResult,
   AgentModel,
+  PersonaDescriptor,
 } from '@automaker/types';
 import { getJSON, setJSON, removeItem } from './storage';
 
@@ -404,6 +407,43 @@ export interface AutoModeAPI {
   onEvent: (callback: (event: AutoModeEvent) => void) => () => void;
 }
 
+export interface BmadStatus {
+  enabled: boolean;
+  artifactsDir: string;
+  installed: boolean;
+  installedVersion: string | null;
+  bundleVersion: string;
+  needsUpgrade: boolean;
+}
+
+export interface BmadAPI {
+  listPersonas: () => Promise<{
+    success: boolean;
+    bundleVersion?: string;
+    personas?: PersonaDescriptor[];
+    error?: string;
+  }>;
+  getStatus: (projectPath: string) => Promise<{
+    success: boolean;
+    status?: BmadStatus;
+    error?: string;
+  }>;
+  initialize: (
+    projectPath: string,
+    options?: { artifactsDir?: string; scaffoldMethodology?: boolean }
+  ) => Promise<{
+    success: boolean;
+    status?: BmadStatus;
+    createdFeatures?: Feature[];
+    error?: string;
+  }>;
+  upgrade: (projectPath: string) => Promise<{
+    success: boolean;
+    status?: BmadStatus;
+    error?: string;
+  }>;
+}
+
 export interface SaveImageResult {
   success: boolean;
   path?: string;
@@ -411,6 +451,8 @@ export interface SaveImageResult {
 }
 
 export interface ElectronAPI {
+  /** Present in Electron builds via preload; used for UI indicators only */
+  isElectron?: boolean;
   ping: () => Promise<string>;
   openExternalLink: (url: string) => Promise<{ success: boolean; error?: string }>;
   openDirectory: () => Promise<DialogResult>;
@@ -466,6 +508,7 @@ export interface ElectronAPI {
   git?: GitAPI;
   suggestions?: SuggestionsAPI;
   specRegeneration?: SpecRegenerationAPI;
+  bmad?: BmadAPI;
   autoMode?: AutoModeAPI;
   features?: FeaturesAPI;
   runningAgents?: RunningAgentsAPI;
@@ -579,6 +622,48 @@ export interface ElectronAPI {
     stop: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     clear: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     onStream: (callback: (data: unknown) => void) => () => void;
+
+    // Prompt queue management (UI helpers)
+    queueAdd: (
+      sessionId: string,
+      message: string,
+      imagePaths?: string[],
+      model?: string
+    ) => Promise<{
+      success: boolean;
+      queuedPrompt?: {
+        id: string;
+        message: string;
+        imagePaths?: string[];
+        model?: string;
+        addedAt: string;
+      };
+      error?: string;
+    }>;
+    queueList: (sessionId: string) => Promise<{
+      success: boolean;
+      queue?: Array<{
+        id: string;
+        message: string;
+        imagePaths?: string[];
+        model?: string;
+        addedAt: string;
+      }>;
+      error?: string;
+    }>;
+    queueRemove: (
+      sessionId: string,
+      promptId: string
+    ) => Promise<{ success: boolean; error?: string }>;
+    queueClear: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+  };
+
+  templates: {
+    clone: (
+      repoUrl: string,
+      projectName: string,
+      parentDir: string
+    ) => Promise<{ success: boolean; projectPath?: string; projectName?: string; error?: string }>;
   };
   sessions?: {
     list: (includeArchived?: boolean) => Promise<{
@@ -625,6 +710,21 @@ export interface ElectronAPI {
       description?: string;
       error?: string;
     }>;
+  };
+
+  backlogPlan?: {
+    generate: (
+      projectPath: string,
+      prompt: string,
+      model?: string
+    ) => Promise<{ success: boolean; error?: string }>;
+    stop: () => Promise<{ success: boolean; error?: string }>;
+    status: () => Promise<{ success: boolean; isRunning?: boolean; error?: string }>;
+    apply: (
+      projectPath: string,
+      plan: BacklogPlanResult
+    ) => Promise<{ success: boolean; appliedChanges?: string[]; error?: string }>;
+    onEvent: (callback: (event: BacklogPlanEvent) => void) => () => void;
   };
 }
 
@@ -745,6 +845,13 @@ if (typeof window !== 'undefined') {
 const getMockElectronAPI = (): ElectronAPI => {
   return {
     ping: async () => 'pong (mock)',
+
+    templates: {
+      clone: async () => ({
+        success: false,
+        error: 'Templates API not available in web mode',
+      }),
+    },
 
     openExternalLink: async (url: string) => {
       // In web mode, open in a new tab

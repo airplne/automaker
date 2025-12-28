@@ -498,7 +498,7 @@ export function TerminalView() {
         // sendBeacon doesn't support DELETE method, so we'll use a sync XMLHttpRequest
         // which is more reliable during page unload than fetch
         try {
-          const xhr = new XMLHttpRequest();
+          const xhr = new globalThis.XMLHttpRequest();
           xhr.open('DELETE', url, false); // synchronous
           if (terminalState.authToken) {
             xhr.setRequestHeader('X-Terminal-Token', terminalState.authToken);

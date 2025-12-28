@@ -224,7 +224,11 @@ export function WelcomeView() {
   /**
    * Create a blank project with just .automaker directory structure
    */
-  const handleCreateBlankProject = async (projectName: string, parentDir: string) => {
+  const handleCreateBlankProject = async (
+    projectName: string,
+    parentDir: string,
+    bmad?: { enabled: boolean; artifactsDir: string; scaffoldMethodology: boolean }
+  ) => {
     setIsCreating(true);
     try {
       const api = getElectronAPI();
@@ -293,6 +297,19 @@ export function WelcomeView() {
 </project_specification>`
       );
 
+      // Initialize BMAD (optional)
+      if (bmad?.enabled) {
+        const result = await api.bmad?.initialize(projectPath, {
+          artifactsDir: bmad.artifactsDir,
+          scaffoldMethodology: bmad.scaffoldMethodology,
+        });
+        if (!result?.success) {
+          toast.error('BMAD initialization failed', {
+            description: result?.error || 'Unknown error',
+          });
+        }
+      }
+
       const project = {
         id: `project-${Date.now()}`,
         name: projectName,
@@ -332,7 +349,8 @@ export function WelcomeView() {
   const handleCreateFromTemplate = async (
     template: StarterTemplate,
     projectName: string,
-    parentDir: string
+    parentDir: string,
+    bmad?: { enabled: boolean; artifactsDir: string; scaffoldMethodology: boolean }
   ) => {
     setIsCreating(true);
     try {
@@ -391,6 +409,19 @@ export function WelcomeView() {
 </project_specification>`
       );
 
+      // Initialize BMAD (optional)
+      if (bmad?.enabled) {
+        const result = await api.bmad?.initialize(projectPath, {
+          artifactsDir: bmad.artifactsDir,
+          scaffoldMethodology: bmad.scaffoldMethodology,
+        });
+        if (!result?.success) {
+          toast.error('BMAD initialization failed', {
+            description: result?.error || 'Unknown error',
+          });
+        }
+      }
+
       const project = {
         id: `project-${Date.now()}`,
         name: projectName,
@@ -433,7 +464,8 @@ export function WelcomeView() {
   const handleCreateFromCustomUrl = async (
     repoUrl: string,
     projectName: string,
-    parentDir: string
+    parentDir: string,
+    bmad?: { enabled: boolean; artifactsDir: string; scaffoldMethodology: boolean }
   ) => {
     setIsCreating(true);
     try {
@@ -487,6 +519,19 @@ export function WelcomeView() {
   </implemented_features>
 </project_specification>`
       );
+
+      // Initialize BMAD (optional)
+      if (bmad?.enabled) {
+        const result = await api.bmad?.initialize(projectPath, {
+          artifactsDir: bmad.artifactsDir,
+          scaffoldMethodology: bmad.scaffoldMethodology,
+        });
+        if (!result?.success) {
+          toast.error('BMAD initialization failed', {
+            description: result?.error || 'Unknown error',
+          });
+        }
+      }
 
       const project = {
         id: `project-${Date.now()}`,

@@ -40,12 +40,11 @@ describe('model-resolver.ts', () => {
       );
     });
 
-    it('should treat unknown models as falling back to default', () => {
-      const models = ['o1', 'o1-mini', 'o3', 'gpt-5.2', 'unknown-model'];
+    it('should treat unknown models as raw model strings (no silent fallback)', () => {
+      const models = ['o1', 'o1-mini', 'o3', 'gpt-5.2', 'unknown-model', 'ollama:llama3.2'];
       models.forEach((model) => {
         const result = resolveModelString(model);
-        // Should fall back to default since these aren't supported
-        expect(result).toBe(DEFAULT_MODELS.claude);
+        expect(result).toBe(model);
       });
     });
 
@@ -71,11 +70,11 @@ describe('model-resolver.ts', () => {
       expect(result).toBe(customDefault);
     });
 
-    it('should return default for unknown model key', () => {
+    it('should pass through unknown model key', () => {
       const result = resolveModelString('unknown-model');
-      expect(result).toBe(DEFAULT_MODELS.claude);
-      expect(consoleSpy.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Unknown model key "unknown-model"')
+      expect(result).toBe('unknown-model');
+      expect(consoleSpy.log).toHaveBeenCalledWith(
+        expect.stringContaining('Using raw model string')
       );
     });
 

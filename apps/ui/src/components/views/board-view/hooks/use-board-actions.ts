@@ -94,6 +94,8 @@ export function useBoardActions({
       skipTests: boolean;
       model: AgentModel;
       thinkingLevel: ThinkingLevel;
+      aiProfileId?: string | null;
+      personaId?: string | null;
       branchName: string;
       priority: number;
       planningMode: PlanningMode;
@@ -212,6 +214,8 @@ export function useBoardActions({
         skipTests: boolean;
         model: AgentModel;
         thinkingLevel: ThinkingLevel;
+        aiProfileId?: string | null;
+        personaId?: string | null;
         imagePaths: DescriptionImagePath[];
         branchName: string;
         priority: number;
@@ -254,10 +258,12 @@ export function useBoardActions({
         }
       }
 
-      const finalUpdates = {
+      const finalUpdates: Partial<Feature> = {
         ...updates,
         title: updates.title,
         branchName: finalBranchName,
+        aiProfileId: updates.aiProfileId ?? undefined,
+        personaId: updates.personaId ?? undefined,
       };
 
       updateFeature(featureId, finalUpdates);
@@ -303,11 +309,18 @@ export function useBoardActions({
         try {
           const api = getElectronAPI();
           for (const imagePathObj of feature.imagePaths) {
+            const imagePath =
+              typeof imagePathObj === 'string'
+                ? imagePathObj
+                : imagePathObj && typeof imagePathObj === 'object' && 'path' in imagePathObj
+                  ? (imagePathObj.path as string)
+                  : null;
+            if (!imagePath) continue;
             try {
-              await api.deleteFile(imagePathObj.path);
-              console.log(`[Board] Deleted image: ${imagePathObj.path}`);
+              await api.deleteFile(imagePath);
+              console.log(`[Board] Deleted image: ${imagePath}`);
             } catch (error) {
-              console.error(`[Board] Failed to delete image ${imagePathObj.path}:`, error);
+              console.error(`[Board] Failed to delete image ${imagePath}:`, error);
             }
           }
         } catch (error) {

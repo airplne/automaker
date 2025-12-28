@@ -3,4 +3,5 @@ export { DeleteAllArchivedSessionsDialog } from './delete-all-archived-sessions-
 export { DeleteSessionDialog } from './delete-session-dialog';
 export { FileBrowserDialog } from './file-browser-dialog';
 export { NewProjectModal } from './new-project-modal';
+export { NpmSecurityApprovalDialog } from './npm-security-approval-dialog';
 export { WorkspacePickerModal } from './workspace-picker-modal';

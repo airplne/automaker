@@ -246,8 +246,11 @@ export class AgentService {
       const maxTurns = sdkOptions.maxTurns;
       const allowedTools = sdkOptions.allowedTools as string[] | undefined;
 
-      // Get provider for this model
-      const provider = ProviderFactory.getProviderForModel(effectiveModel);
+      // Get provider for this model (pass settingsService for npm security)
+      const provider = ProviderFactory.getProviderForModel(
+        effectiveModel,
+        this.settingsService ?? undefined
+      );
 
       console.log(
         `[AgentService] Using provider "${provider.getName()}" for model "${effectiveModel}"`

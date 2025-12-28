@@ -13,8 +13,25 @@ import type {
   InstallationStatus,
   ModelDefinition,
 } from './types.js';
+import type { SettingsService } from '../services/settings-service.js';
+import {
+  createNpmSecurityEnforcer,
+  type PolicyEnforcerCallbacks,
+} from '../lib/npm-security-policy.js';
+import { DEFAULT_NPM_SECURITY_SETTINGS } from '@automaker/types';
+import { createLogger } from '@automaker/utils';
+import { randomUUID } from 'node:crypto';
+
+const logger = createLogger('ClaudeProvider');
 
 export class ClaudeProvider extends BaseProvider {
+  private settingsService?: SettingsService;
+
+  constructor(settingsService?: SettingsService) {
+    super();
+    this.settingsService = settingsService;
+  }
+
   getName(): string {
     return 'claude';
   }
@@ -28,8 +45,12 @@ export class ClaudeProvider extends BaseProvider {
       model,
       cwd,
       systemPrompt,
+      maxThinkingTokens,
+      outputFormat,
       maxTurns = 20,
       allowedTools,
+      mcpServers,
+      hooks,
       abortController,
       conversationHistory,
       sdkSessionId,
@@ -39,9 +60,94 @@ export class ClaudeProvider extends BaseProvider {
     const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'];
     const toolsToUse = allowedTools || defaultTools;
 
+    // Load npm security settings from project
+    let npmSecurityPolicy = DEFAULT_NPM_SECURITY_SETTINGS;
+    if (this.settingsService && cwd) {
+      try {
+        const projectSettings = await this.settingsService.getProjectSettings(cwd);
+        if (projectSettings.npmSecurity) {
+          npmSecurityPolicy = {
+            ...DEFAULT_NPM_SECURITY_SETTINGS,
+            ...projectSettings.npmSecurity,
+          };
+        }
+      } catch (error) {
+        logger.warn('[ClaudeProvider] Failed to load npm security settings:', error);
+      }
+    }
+
+    // Create npm security enforcer with callbacks
+    const callbacks: PolicyEnforcerCallbacks = {
+      onApprovalRequired: async (request) => {
+        if (!request) return 'cancel';
+
+        // Import and use requestApproval from approval routes
+        const { requestApproval } = await import('../routes/npm-security/routes/approval.js');
+
+        try {
+          const decision = await requestApproval({
+            ...request,
+            projectPath: cwd,
+          });
+          return decision as 'proceed-safe' | 'allow-once' | 'allow-project' | 'cancel';
+        } catch (error) {
+          // SECURITY: Default to cancel/deny on error
+          logger.error('[ClaudeProvider] Approval request failed:', error);
+          return 'cancel';
+        }
+      },
+      onAuditLog: (entry) => {
+        // Log to settings service - failures should not break command execution
+        if (this.settingsService && cwd) {
+          try {
+            this.settingsService.logNpmSecurityAudit({
+              projectPath: cwd,
+              eventType: entry.eventType,
+              command: entry.command
+                ? {
+                    original: entry.command.original,
+                    type: entry.command.type,
+                    packageManager: entry.command.packageManager,
+                    isInstallCommand: entry.command.isInstallCommand,
+                    isHighRiskExecute: entry.command.isHighRiskExecute,
+                    rewrittenCommand: entry.command.rewrittenCommand,
+                    requiresApproval: entry.command.requiresApproval,
+                    riskLevel: entry.command.riskLevel,
+                  }
+                : undefined,
+              decision: entry.decision,
+            });
+          } catch (error) {
+            logger.error('[ClaudeProvider] Failed to log npm security audit:', error);
+          }
+        }
+      },
+    };
+
+    const npmEnforcer = createNpmSecurityEnforcer(npmSecurityPolicy, cwd, callbacks);
+
+    // Merge npm security hooks with any existing hooks
+    const mergedHooks = {
+      ...(hooks || {}),
+      // Add beforeBashExecution hook from npm security enforcer
+      beforeBashExecution: async (command: string) => {
+        // Call existing hook if present
+        let modifiedCommand = command;
+        if (hooks && typeof (hooks as any).beforeBashExecution === 'function') {
+          modifiedCommand = await (hooks as any).beforeBashExecution(command);
+        }
+        // Apply npm security policy enforcement
+        return await npmEnforcer.beforeBashExecution(modifiedCommand);
+      },
+    };
+
     const sdkOptions: Options = {
       model,
       systemPrompt,
+      ...(maxThinkingTokens !== undefined ? { maxThinkingTokens } : {}),
+      ...(outputFormat ? { outputFormat: outputFormat as Options['outputFormat'] } : {}),
+      ...(mcpServers ? { mcpServers: mcpServers as Options['mcpServers'] } : {}),
+      hooks: mergedHooks as Options['hooks'],
       maxTurns,
       cwd,
       allowedTools: toolsToUse,

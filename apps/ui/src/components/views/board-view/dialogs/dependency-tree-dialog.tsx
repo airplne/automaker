@@ -101,41 +101,44 @@ export function DependencyTreeDialog({
               </div>
             ) : (
               <div className="space-y-2">
-                {dependencyTree.dependencies.map((dep) => (
-                  <div
-                    key={dep.id}
-                    className={cn(
-                      'border rounded-lg p-3 transition-colors',
-                      dep.status === 'completed' || dep.status === 'verified'
-                        ? 'bg-green-500/5 border-green-500/20'
-                        : 'bg-muted/30 border-border'
-                    )}
-                  >
-                    <div className="flex items-center gap-3 mb-1">
-                      {getStatusIcon(dep.status)}
-                      <span className="text-sm font-medium flex-1">
-                        {dep.description.slice(0, 100)}
-                        {dep.description.length > 100 && '...'}
-                      </span>
-                      {getPriorityBadge(dep.priority)}
+                {dependencyTree.dependencies.map((dep) => {
+                  const status = dep.status ?? 'backlog';
+                  return (
+                    <div
+                      key={dep.id}
+                      className={cn(
+                        'border rounded-lg p-3 transition-colors',
+                        status === 'completed' || status === 'verified'
+                          ? 'bg-green-500/5 border-green-500/20'
+                          : 'bg-muted/30 border-border'
+                      )}
+                    >
+                      <div className="flex items-center gap-3 mb-1">
+                        {getStatusIcon(status)}
+                        <span className="text-sm font-medium flex-1">
+                          {dep.description.slice(0, 100)}
+                          {dep.description.length > 100 && '...'}
+                        </span>
+                        {getPriorityBadge(dep.priority)}
+                      </div>
+                      <div className="flex items-center gap-3 ml-7">
+                        <span className="text-xs text-muted-foreground">{dep.category}</span>
+                        <span
+                          className={cn(
+                            'text-xs px-2 py-0.5 rounded-full',
+                            status === 'completed' || status === 'verified'
+                              ? 'bg-green-500/20 text-green-600'
+                              : status === 'in_progress'
+                                ? 'bg-blue-500/20 text-blue-600'
+                                : 'bg-muted text-muted-foreground'
+                          )}
+                        >
+                          {status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 ml-7">
-                      <span className="text-xs text-muted-foreground">{dep.category}</span>
-                      <span
-                        className={cn(
-                          'text-xs px-2 py-0.5 rounded-full',
-                          dep.status === 'completed' || dep.status === 'verified'
-                            ? 'bg-green-500/20 text-green-600'
-                            : dep.status === 'in_progress'
-                              ? 'bg-blue-500/20 text-blue-600'
-                              : 'bg-muted text-muted-foreground'
-                        )}
-                      >
-                        {dep.status.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -155,33 +158,36 @@ export function DependencyTreeDialog({
               </div>
             ) : (
               <div className="space-y-2">
-                {dependencyTree.dependents.map((dependent) => (
-                  <div key={dependent.id} className="border rounded-lg p-3 bg-muted/30">
-                    <div className="flex items-center gap-3 mb-1">
-                      {getStatusIcon(dependent.status)}
-                      <span className="text-sm font-medium flex-1">
-                        {dependent.description.slice(0, 100)}
-                        {dependent.description.length > 100 && '...'}
-                      </span>
-                      {getPriorityBadge(dependent.priority)}
+                {dependencyTree.dependents.map((dependent) => {
+                  const status = dependent.status ?? 'backlog';
+                  return (
+                    <div key={dependent.id} className="border rounded-lg p-3 bg-muted/30">
+                      <div className="flex items-center gap-3 mb-1">
+                        {getStatusIcon(status)}
+                        <span className="text-sm font-medium flex-1">
+                          {dependent.description.slice(0, 100)}
+                          {dependent.description.length > 100 && '...'}
+                        </span>
+                        {getPriorityBadge(dependent.priority)}
+                      </div>
+                      <div className="flex items-center gap-3 ml-7">
+                        <span className="text-xs text-muted-foreground">{dependent.category}</span>
+                        <span
+                          className={cn(
+                            'text-xs px-2 py-0.5 rounded-full',
+                            status === 'completed' || status === 'verified'
+                              ? 'bg-green-500/20 text-green-600'
+                              : status === 'in_progress'
+                                ? 'bg-blue-500/20 text-blue-600'
+                                : 'bg-muted text-muted-foreground'
+                          )}
+                        >
+                          {status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 ml-7">
-                      <span className="text-xs text-muted-foreground">{dependent.category}</span>
-                      <span
-                        className={cn(
-                          'text-xs px-2 py-0.5 rounded-full',
-                          dependent.status === 'completed' || dependent.status === 'verified'
-                            ? 'bg-green-500/20 text-green-600'
-                            : dependent.status === 'in_progress'
-                              ? 'bg-blue-500/20 text-blue-600'
-                              : 'bg-muted text-muted-foreground'
-                        )}
-                      >
-                        {dependent.status.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

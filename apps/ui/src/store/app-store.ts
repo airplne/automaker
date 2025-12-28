@@ -4,13 +4,26 @@ import type { Project, TrashedProject } from '@/lib/electron';
 import type {
   Feature as BaseFeature,
   FeatureImagePath,
+  FeatureTextFilePath,
   AgentModel,
   PlanningMode,
   AIProfile,
+  ThinkingLevel,
+  ModelProvider,
+  ThemeMode,
 } from '@automaker/types';
 
-// Re-export ThemeMode for convenience
-export type { ThemeMode };
+// Re-export shared types for convenience
+export type {
+  ThemeMode,
+  FeatureImagePath,
+  FeatureTextFilePath,
+  AgentModel,
+  PlanningMode,
+  ThinkingLevel,
+  ModelProvider,
+  AIProfile,
+};
 
 export type ViewMode =
   | 'welcome'
@@ -25,25 +38,6 @@ export type ViewMode =
   | 'running-agents'
   | 'terminal'
   | 'wiki';
-
-export type ThemeMode =
-  | 'light'
-  | 'dark'
-  | 'system'
-  | 'retro'
-  | 'dracula'
-  | 'nord'
-  | 'monokai'
-  | 'tokyonight'
-  | 'solarized'
-  | 'gruvbox'
-  | 'catppuccin'
-  | 'onedark'
-  | 'synthwave'
-  | 'red'
-  | 'cream'
-  | 'sunset'
-  | 'gray';
 
 export type KanbanCardDetailLevel = 'minimal' | 'standard' | 'detailed';
 
@@ -253,22 +247,12 @@ export interface FeatureImage {
 // Available models for feature execution
 export type ClaudeModel = 'opus' | 'sonnet' | 'haiku';
 
-export interface Feature extends Omit<
-  BaseFeature,
-  'steps' | 'imagePaths' | 'textFilePaths' | 'status'
-> {
-  id: string;
-  title?: string;
-  titleGenerating?: boolean;
-  category: string;
-  description: string;
-  steps: string[]; // Required in UI (not optional)
-  status: 'backlog' | 'in_progress' | 'waiting_approval' | 'verified' | 'completed';
-  images?: FeatureImage[]; // UI-specific base64 images
-  imagePaths?: FeatureImagePath[]; // Stricter type than base (no string | union)
-  textFilePaths?: FeatureTextFilePath[]; // Text file attachments for context
+export interface Feature extends BaseFeature {
+  images?: FeatureImage[]; // UI-specific base64 images (not in shared types)
   justFinishedAt?: string; // UI-specific: ISO timestamp when agent just finished
   prUrl?: string; // UI-specific: Pull request URL
+  // UI adds richer planSpec details (tasks, currentTaskId) not currently in shared Feature type
+  planSpec?: PlanSpec;
 }
 
 // Parsed task from spec (for spec and full planning modes)
@@ -526,6 +510,30 @@ export interface AppState {
     projectPath: string;
     planContent: string;
     planningMode: 'lite' | 'spec' | 'full';
+  } | null;
+
+  // Npm Security Approval State
+  // When an npm command requires user approval, this holds the pending approval details
+  pendingNpmSecurityApproval: {
+    id: string;
+    featureId: string;
+    worktreeId?: string;
+    projectPath: string;
+    command: {
+      original: string;
+      type: string;
+      packageManager: string;
+      riskLevel: string;
+    };
+    timestamp: number;
+    options: Array<{
+      id: string;
+      label: string;
+      description: string;
+      action: string;
+      isDefault?: boolean;
+      isRecommended?: boolean;
+    }>;
   } | null;
 
   // Claude Usage Tracking
@@ -853,6 +861,41 @@ export interface AppActions {
     } | null
   ) => void;
 
+  // Npm Security Approval actions
+  setPendingNpmSecurityApproval: (
+    approval: {
+      id: string;
+      featureId: string;
+      worktreeId?: string;
+      projectPath: string;
+      command: {
+        original: string;
+        type: string;
+        packageManager: string;
+        riskLevel: string;
+      };
+      timestamp: number;
+      options: Array<{
+        id: string;
+        label: string;
+        description: string;
+        action: string;
+        isDefault?: boolean;
+        isRecommended?: boolean;
+      }>;
+    } | null
+  ) => void;
+  resolveNpmSecurityApproval: (
+    requestId: string,
+    decision: string,
+    rememberChoice: boolean
+  ) => Promise<void>;
+
+  // Claude Usage Tracking actions
+  setClaudeRefreshInterval: (interval: number) => void;
+  setClaudeUsageLastUpdated: (timestamp: number) => void;
+  setClaudeUsage: (usage: ClaudeUsage | null) => void;
+
   // Reset
   reset: () => void;
 }
@@ -889,6 +932,52 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     provider: 'claude',
     isBuiltIn: true,
     icon: 'Zap',
+  },
+  {
+    id: 'profile-bmad-party-synthesis',
+    name: 'BMAD: Party Synthesis',
+    description: 'One-shot multi-agent deliberation with a single synthesized recommendation.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Brain',
+    personaId: 'bmad:party-synthesis',
+  },
+  {
+    id: 'profile-bmad-sage',
+    name: 'BMAD: Sage (Strategist-Marketer)',
+    description:
+      'Product Strategist + Market Intelligence Expert. Strategic vision and market insights.',
+    model: 'opus',
+    thinkingLevel: 'high',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Rocket',
+    personaId: 'bmad:strategist-marketer',
+  },
+  {
+    id: 'profile-bmad-theo',
+    name: 'BMAD: Theo (Technologist-Architect)',
+    description:
+      'Technical Architect + Implementation Specialist. System design and technical execution.',
+    model: 'opus',
+    thinkingLevel: 'high',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Cpu',
+    personaId: 'bmad:technologist-architect',
+  },
+  {
+    id: 'profile-bmad-finn',
+    name: 'BMAD: Finn (Fulfillization-Manager)',
+    description: 'Delivery + Experience + Operations Specialist. End-to-end execution and quality.',
+    model: 'sonnet',
+    thinkingLevel: 'medium',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Scale',
+    personaId: 'bmad:fulfillization-manager',
   },
 ];
 
@@ -955,6 +1044,10 @@ const initialState: AppState = {
   defaultRequirePlanApproval: false,
   defaultAIProfileId: null,
   pendingPlanApproval: null,
+  pendingNpmSecurityApproval: null,
+  claudeRefreshInterval: 60,
+  claudeUsage: null,
+  claudeUsageLastUpdated: null,
 };
 
 export const useAppStore = create<AppState & AppActions>()(
@@ -1566,12 +1659,18 @@ export const useAppStore = create<AppState & AppActions>()(
       addAIProfile: (profile) => {
         const id = `profile-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         set({ aiProfiles: [...get().aiProfiles, { ...profile, id }] });
+        void import('@/hooks/use-settings-migration').then(({ syncSettingsToServer }) =>
+          syncSettingsToServer()
+        );
       },
 
       updateAIProfile: (id, updates) => {
         set({
           aiProfiles: get().aiProfiles.map((p) => (p.id === id ? { ...p, ...updates } : p)),
         });
+        void import('@/hooks/use-settings-migration').then(({ syncSettingsToServer }) =>
+          syncSettingsToServer()
+        );
       },
 
       removeAIProfile: (id) => {
@@ -1583,6 +1682,9 @@ export const useAppStore = create<AppState & AppActions>()(
             set({ defaultAIProfileId: null });
           }
           set({ aiProfiles: get().aiProfiles.filter((p) => p.id !== id) });
+          void import('@/hooks/use-settings-migration').then(({ syncSettingsToServer }) =>
+            syncSettingsToServer()
+          );
         }
       },
 
@@ -1591,6 +1693,9 @@ export const useAppStore = create<AppState & AppActions>()(
         const [movedProfile] = profiles.splice(oldIndex, 1);
         profiles.splice(newIndex, 0, movedProfile);
         set({ aiProfiles: profiles });
+        void import('@/hooks/use-settings-migration').then(({ syncSettingsToServer }) =>
+          syncSettingsToServer()
+        );
       },
 
       resetAIProfiles: () => {
@@ -1600,6 +1705,9 @@ export const useAppStore = create<AppState & AppActions>()(
           (p) => !p.isBuiltIn && !defaultProfileIds.has(p.id)
         );
         set({ aiProfiles: [...DEFAULT_AI_PROFILES, ...userProfiles] });
+        void import('@/hooks/use-settings-migration').then(({ syncSettingsToServer }) =>
+          syncSettingsToServer()
+        );
       },
 
       // Project Analysis actions
@@ -2567,6 +2675,36 @@ export const useAppStore = create<AppState & AppActions>()(
       // Plan Approval actions
       setPendingPlanApproval: (approval) => set({ pendingPlanApproval: approval }),
 
+      // Npm Security Approval actions
+      setPendingNpmSecurityApproval: (approval) => set({ pendingNpmSecurityApproval: approval }),
+      resolveNpmSecurityApproval: async (requestId, decision, rememberChoice) => {
+        try {
+          const response = await fetch(`/api/npm-security/approval/${requestId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              decision,
+              rememberChoice,
+            }),
+          });
+
+          if (!response.ok) {
+            const error = await response
+              .json()
+              .catch(() => ({ error: 'Failed to resolve approval' }));
+            throw new Error(error.error || 'Failed to resolve approval');
+          }
+
+          // Clear the pending approval after successful resolution
+          set({ pendingNpmSecurityApproval: null });
+        } catch (error) {
+          console.error('[AppStore] Error resolving npm security approval:', error);
+          // Clear the pending approval even on error to prevent stuck state
+          set({ pendingNpmSecurityApproval: null });
+          throw error;
+        }
+      },
+
       // Claude Usage Tracking actions
       setClaudeRefreshInterval: (interval: number) => set({ claudeRefreshInterval: interval }),
       setClaudeUsageLastUpdated: (timestamp: number) => set({ claudeUsageLastUpdated: timestamp }),
@@ -2581,7 +2719,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'automaker-storage',
-      version: 2, // Increment when making breaking changes to persisted state
+      version: 3, // Increment when making breaking changes to persisted state
       // Custom merge function to properly restore terminal settings on every load
       // The default shallow merge doesn't work because we persist terminalSettings
       // separately from terminalState (to avoid persisting session data like tabs)
@@ -2643,6 +2781,17 @@ export const useAppStore = create<AppState & AppActions>()(
               terminal: 'T',
             };
           }
+        }
+
+        // Migration from version 2 to version 3:
+        // - Add any newly introduced built-in AI profiles (e.g., BMAD profiles)
+        if (version <= 2) {
+          const existingProfiles = (state.aiProfiles as AIProfile[] | undefined) ?? [];
+          const existingIds = new Set(existingProfiles.map((p) => p.id));
+          state.aiProfiles = [
+            ...existingProfiles,
+            ...DEFAULT_AI_PROFILES.filter((p) => !existingIds.has(p.id)),
+          ];
         }
 
         // Rehydrate terminal settings from persisted state

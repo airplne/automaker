@@ -13,6 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   FolderPlus,
   FolderOpen,
@@ -39,13 +47,23 @@ interface ValidationErrors {
 interface NewProjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateBlankProject: (projectName: string, parentDir: string) => Promise<void>;
+  onCreateBlankProject: (
+    projectName: string,
+    parentDir: string,
+    bmad?: { enabled: boolean; artifactsDir: string; scaffoldMethodology: boolean }
+  ) => Promise<void>;
   onCreateFromTemplate: (
     template: StarterTemplate,
     projectName: string,
-    parentDir: string
+    parentDir: string,
+    bmad?: { enabled: boolean; artifactsDir: string; scaffoldMethodology: boolean }
   ) => Promise<void>;
-  onCreateFromCustomUrl: (repoUrl: string, projectName: string, parentDir: string) => Promise<void>;
+  onCreateFromCustomUrl: (
+    repoUrl: string,
+    projectName: string,
+    parentDir: string,
+    bmad?: { enabled: boolean; artifactsDir: string; scaffoldMethodology: boolean }
+  ) => Promise<void>;
   isCreating: boolean;
 }
 
@@ -65,6 +83,9 @@ export function NewProjectModal({
   const [useCustomUrl, setUseCustomUrl] = useState(false);
   const [customUrl, setCustomUrl] = useState('');
   const [errors, setErrors] = useState<ValidationErrors>({});
+  const [enableBmad, setEnableBmad] = useState(false);
+  const [bmadArtifactsDir, setBmadArtifactsDir] = useState('.automaker/bmad-output');
+  const [scaffoldBmadMethodology, setScaffoldBmadMethodology] = useState(false);
   const { openFileBrowser } = useFileBrowser();
 
   // Fetch workspace directory when modal opens
@@ -95,6 +116,9 @@ export function NewProjectModal({
       setCustomUrl('');
       setActiveTab('blank');
       setErrors({});
+      setEnableBmad(false);
+      setBmadArtifactsDir('.automaker/bmad-output');
+      setScaffoldBmadMethodology(false);
     }
   }, [open]);
 
@@ -150,12 +174,18 @@ export function NewProjectModal({
     // Clear errors and proceed
     setErrors({});
 
+    const bmad = {
+      enabled: enableBmad,
+      artifactsDir: bmadArtifactsDir,
+      scaffoldMethodology: scaffoldBmadMethodology,
+    };
+
     if (activeTab === 'blank') {
-      await onCreateBlankProject(projectName, workspaceDir);
+      await onCreateBlankProject(projectName, workspaceDir, bmad);
     } else if (useCustomUrl && customUrl) {
-      await onCreateFromCustomUrl(customUrl, projectName, workspaceDir);
+      await onCreateFromCustomUrl(customUrl, projectName, workspaceDir, bmad);
     } else if (selectedTemplate) {
-      await onCreateFromTemplate(selectedTemplate, projectName, workspaceDir);
+      await onCreateFromTemplate(selectedTemplate, projectName, workspaceDir, bmad);
     }
   };
 
@@ -277,6 +307,66 @@ export function NewProjectModal({
               <FolderOpen className="w-3.5 h-3.5 mr-1" />
               Browse
             </Button>
+          </div>
+
+          {/* BMAD Options */}
+          <div className="rounded-xl bg-muted/30 border border-border/50 p-4 space-y-4">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="enable-bmad-checkbox"
+                checked={enableBmad}
+                onCheckedChange={(value) => setEnableBmad(Boolean(value))}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="enable-bmad-checkbox" className="text-foreground font-medium">
+                  Enable BMAD
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Installs BMAD workflows to <code>_bmad/</code> and enables BMAD personas.
+                </p>
+              </div>
+            </div>
+
+            {enableBmad && (
+              <div className="pl-7 space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-foreground">Artifacts Directory</Label>
+                  <Select
+                    value={bmadArtifactsDir}
+                    onValueChange={(value) => setBmadArtifactsDir(value)}
+                  >
+                    <SelectTrigger className="h-9" data-testid="new-project-bmad-artifacts-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=".automaker/bmad-output">
+                        .automaker/bmad-output (default)
+                      </SelectItem>
+                      <SelectItem value="_bmad-output">_bmad-output (project root)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Default keeps artifacts AutoMaker-managed; project root is easier to commit.
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="scaffold-bmad-checkbox"
+                    checked={scaffoldBmadMethodology}
+                    onCheckedChange={(value) => setScaffoldBmadMethodology(Boolean(value))}
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="scaffold-bmad-checkbox" className="text-foreground font-medium">
+                      Scaffold BMAD methodology
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Optional backlog cards (PRD → Architecture → Epics → Stories).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

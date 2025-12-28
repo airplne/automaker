@@ -17,6 +17,11 @@ export function createProvidersHandler() {
           available: statuses.claude?.installed || false,
           hasApiKey: !!process.env.ANTHROPIC_API_KEY,
         },
+        ollama: {
+          available: statuses.ollama?.installed || false,
+          baseUrl: process.env.AUTOMAKER_OLLAMA_BASE_URL || process.env.OLLAMA_HOST || undefined,
+          error: statuses.ollama?.error,
+        },
       };
 
       res.json({ success: true, providers });

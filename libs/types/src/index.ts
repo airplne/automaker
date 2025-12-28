@@ -42,6 +42,15 @@ export type { EventType, EventCallback } from './event.js';
 export type { SpecOutput } from './spec.js';
 export { specOutputSchema } from './spec.js';
 
+// BMAD types
+export type {
+  PersonaId,
+  PersonaDescriptor,
+  ResolvedPersona,
+  ResolvedAgentCollab,
+  PartySynthesisResult,
+} from './bmad.js';
+
 // Enhancement types
 export type { EnhancementMode, EnhancementExample } from './enhancement.js';
 
@@ -105,3 +114,16 @@ export type {
   BacklogPlanRequest,
   BacklogPlanApplyResult,
 } from './backlog-plan.js';
+
+// NPM Security types
+export type {
+  NpmCommandType,
+  DependencyInstallPolicy,
+  NpmSecuritySettings,
+  ClassifiedCommand,
+  NpmSecurityApprovalRequest,
+  NpmSecurityApprovalOption,
+  NpmSecurityApprovalResponse,
+  NpmSecurityAuditEntry,
+} from './npm-security.js';
+export { DEFAULT_NPM_SECURITY_SETTINGS } from './npm-security.js';

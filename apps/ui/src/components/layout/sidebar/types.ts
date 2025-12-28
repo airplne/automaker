@@ -1,6 +1,22 @@
 import type { Project } from '@/lib/electron';
 import type React from 'react';
 
+export type NavTo =
+  | '/'
+  | '/agent'
+  | '/board'
+  | '/context'
+  | '/github-issues'
+  | '/github-prs'
+  | '/interview'
+  | '/profiles'
+  | '/running-agents'
+  | '/settings'
+  | '/setup'
+  | '/spec'
+  | '/terminal'
+  | '/wiki';
+
 export interface NavSection {
   label?: string;
   items: NavItem[];
@@ -8,6 +24,7 @@ export interface NavSection {
 
 export interface NavItem {
   id: string;
+  to: NavTo;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   shortcut?: string;

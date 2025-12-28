@@ -348,6 +348,51 @@ describe('terminal-service.ts', () => {
       expect(exitCallback).toHaveBeenCalledWith(session.id, 0);
       expect(service.getSession(session.id)).toBeUndefined();
     });
+
+    it('should apply secure npm environment variables by default', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+      vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
+
+      service.createSession({
+        cwd: '/test/dir',
+      });
+
+      expect(pty.spawn).toHaveBeenCalled();
+      const spawnCall = vi.mocked(pty.spawn).mock.calls[0];
+      const envArg = spawnCall[2].env as Record<string, string>;
+
+      // Verify secure npm environment variables are set
+      expect(envArg.npm_config_ignore_scripts).toBe('true');
+      expect(envArg.npm_config_audit).toBe('true');
+      expect(envArg.npm_config_audit_level).toBe('moderate');
+      expect(envArg.npm_config_strict_ssl).toBe('true');
+      expect(envArg.PNPM_IGNORE_SCRIPTS).toBe('true');
+      expect(envArg.YARN_ENABLE_SCRIPTS).toBe('false');
+    });
+
+    it('should allow user env vars to override secure defaults', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+      vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
+
+      service.createSession({
+        cwd: '/test/dir',
+        env: {
+          npm_config_ignore_scripts: 'false', // User override
+        },
+      });
+
+      expect(pty.spawn).toHaveBeenCalled();
+      const spawnCall = vi.mocked(pty.spawn).mock.calls[0];
+      const envArg = spawnCall[2].env as Record<string, string>;
+
+      // User override should take precedence
+      expect(envArg.npm_config_ignore_scripts).toBe('false');
+      // Other secure vars should still be set
+      expect(envArg.npm_config_audit).toBe('true');
+      expect(envArg.PNPM_IGNORE_SCRIPTS).toBe('true');
+    });
   });
 
   describe('write', () => {

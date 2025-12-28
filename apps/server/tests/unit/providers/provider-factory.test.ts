@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ProviderFactory } from '@/providers/provider-factory.js';
 import { ClaudeProvider } from '@/providers/claude-provider.js';
+import { OllamaProvider } from '@/providers/ollama-provider.js';
 
 describe('provider-factory.ts', () => {
   let consoleSpy: any;
@@ -66,6 +67,16 @@ describe('provider-factory.ts', () => {
     });
 
     describe('Unknown models', () => {
+      it('should return OllamaProvider for ollama:* models', () => {
+        const provider = ProviderFactory.getProviderForModel('ollama:llama3.2');
+        expect(provider).toBeInstanceOf(OllamaProvider);
+      });
+
+      it('should return OllamaProvider for ollama-* models', () => {
+        const provider = ProviderFactory.getProviderForModel('ollama-llama3.2');
+        expect(provider).toBeInstanceOf(OllamaProvider);
+      });
+
       it('should default to ClaudeProvider for unknown model', () => {
         const provider = ProviderFactory.getProviderForModel('unknown-model-123');
         expect(provider).toBeInstanceOf(ClaudeProvider);
@@ -114,9 +125,15 @@ describe('provider-factory.ts', () => {
       expect(hasClaudeProvider).toBe(true);
     });
 
-    it('should return exactly 1 provider', () => {
+    it('should include OllamaProvider', () => {
       const providers = ProviderFactory.getAllProviders();
-      expect(providers).toHaveLength(1);
+      const hasOllamaProvider = providers.some((p) => p instanceof OllamaProvider);
+      expect(hasOllamaProvider).toBe(true);
+    });
+
+    it('should return exactly 2 providers', () => {
+      const providers = ProviderFactory.getAllProviders();
+      expect(providers).toHaveLength(2);
     });
 
     it('should create new instances each time', () => {
@@ -124,6 +141,7 @@ describe('provider-factory.ts', () => {
       const providers2 = ProviderFactory.getAllProviders();
 
       expect(providers1[0]).not.toBe(providers2[0]);
+      expect(providers1[1]).not.toBe(providers2[1]);
     });
   });
 
@@ -132,6 +150,7 @@ describe('provider-factory.ts', () => {
       const statuses = await ProviderFactory.checkAllProviders();
 
       expect(statuses).toHaveProperty('claude');
+      expect(statuses).toHaveProperty('ollama');
     });
 
     it('should call detectInstallation on each provider', async () => {
@@ -145,7 +164,8 @@ describe('provider-factory.ts', () => {
       const keys = Object.keys(statuses);
 
       expect(keys).toContain('claude');
-      expect(keys).toHaveLength(1);
+      expect(keys).toContain('ollama');
+      expect(keys).toHaveLength(2);
     });
   });
 
@@ -185,6 +205,11 @@ describe('provider-factory.ts', () => {
       expect(provider1).not.toBe(provider2);
       expect(provider1).toBeInstanceOf(ClaudeProvider);
       expect(provider2).toBeInstanceOf(ClaudeProvider);
+    });
+
+    it("should return OllamaProvider for 'ollama'", () => {
+      const provider = ProviderFactory.getProviderByName('ollama');
+      expect(provider).toBeInstanceOf(OllamaProvider);
     });
   });
 

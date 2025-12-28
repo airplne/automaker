@@ -3,59 +3,69 @@
  */
 
 import type { Request, Response } from 'express';
+import { ProviderFactory } from '../../../providers/provider-factory.js';
+import type { ModelDefinition } from '../../../providers/types.js';
 import { getErrorMessage, logError } from '../common.js';
 
-interface ModelDefinition {
-  id: string;
-  name: string;
-  provider: string;
-  contextWindow: number;
-  maxOutputTokens: number;
-  supportsVision: boolean;
-  supportsTools: boolean;
+function normalizeBaseUrl(raw?: string): string {
+  const value = (raw || '').trim();
+  if (!value) return 'http://localhost:11434';
+  const withProtocol =
+    value.startsWith('http://') || value.startsWith('https://') ? value : `http://${value}`;
+  return withProtocol.replace(/\/+$/, '');
+}
+
+async function getOllamaInstalledModels(): Promise<ModelDefinition[]> {
+  const baseUrl = normalizeBaseUrl(
+    process.env.AUTOMAKER_OLLAMA_BASE_URL || process.env.OLLAMA_HOST
+  );
+  try {
+    const timeoutMs = 1500;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    let resp: globalThis.Response;
+    try {
+      resp = await fetch(`${baseUrl}/api/tags`, { method: 'GET', signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (!resp.ok) return [];
+
+    const data = (await resp.json()) as { models?: Array<{ name?: unknown }> };
+    const names = Array.isArray(data.models)
+      ? data.models
+          .map((m) => (typeof m?.name === 'string' ? m.name : null))
+          .filter((n): n is string => !!n)
+      : [];
+
+    return names.map((name) => ({
+      id: `ollama:${name}`,
+      name: `Ollama ${name}`,
+      modelString: `ollama:${name}`,
+      provider: 'ollama',
+      description: 'Installed locally in Ollama',
+      supportsVision: false,
+      supportsTools: true,
+      tier: 'basic' as const,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 export function createAvailableHandler() {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
-      const models: ModelDefinition[] = [
-        {
-          id: 'claude-opus-4-5-20251101',
-          name: 'Claude Opus 4.5',
-          provider: 'anthropic',
-          contextWindow: 200000,
-          maxOutputTokens: 16384,
-          supportsVision: true,
-          supportsTools: true,
-        },
-        {
-          id: 'claude-sonnet-4-20250514',
-          name: 'Claude Sonnet 4',
-          provider: 'anthropic',
-          contextWindow: 200000,
-          maxOutputTokens: 16384,
-          supportsVision: true,
-          supportsTools: true,
-        },
-        {
-          id: 'claude-3-5-sonnet-20241022',
-          name: 'Claude 3.5 Sonnet',
-          provider: 'anthropic',
-          contextWindow: 200000,
-          maxOutputTokens: 8192,
-          supportsVision: true,
-          supportsTools: true,
-        },
-        {
-          id: 'claude-3-5-haiku-20241022',
-          name: 'Claude 3.5 Haiku',
-          provider: 'anthropic',
-          contextWindow: 200000,
-          maxOutputTokens: 8192,
-          supportsVision: true,
-          supportsTools: true,
-        },
-      ];
+      const providerModels = ProviderFactory.getAllAvailableModels();
+      const ollamaInstalled = await getOllamaInstalledModels();
+
+      const byId = new Map<string, ModelDefinition>();
+      for (const model of [...providerModels, ...ollamaInstalled]) {
+        byId.set(model.id, model);
+      }
+
+      const models = Array.from(byId.values());
 
       res.json({ success: true, models });
     } catch (error) {

@@ -214,6 +214,15 @@ export interface CreateSdkOptionsConfig {
     schema: Record<string, unknown>;
   };
 
+  /** Optional max thinking token budget (Claude SDK) */
+  maxThinkingTokens?: number;
+
+  /** Optional MCP server configurations */
+  mcpServers?: Record<string, unknown>;
+
+  /** Optional Claude Code hooks configuration */
+  hooks?: Record<string, unknown>;
+
   /** Enable auto-loading of CLAUDE.md files via SDK's settingSources */
   autoLoadClaudeMd?: boolean;
 }
@@ -247,6 +256,11 @@ export function createSpecGenerationOptions(config: CreateSdkOptionsConfig): Opt
     ...claudeMdOptions,
     ...(config.abortController && { abortController: config.abortController }),
     ...(config.outputFormat && { outputFormat: config.outputFormat }),
+    ...(config.maxThinkingTokens !== undefined
+      ? { maxThinkingTokens: config.maxThinkingTokens }
+      : {}),
+    ...(config.mcpServers ? { mcpServers: config.mcpServers as Options['mcpServers'] } : {}),
+    ...(config.hooks ? { hooks: config.hooks as Options['hooks'] } : {}),
   };
 }
 
@@ -276,6 +290,12 @@ export function createFeatureGenerationOptions(config: CreateSdkOptionsConfig): 
     allowedTools: [...TOOL_PRESETS.readOnly],
     ...claudeMdOptions,
     ...(config.abortController && { abortController: config.abortController }),
+    ...(config.outputFormat && { outputFormat: config.outputFormat }),
+    ...(config.maxThinkingTokens !== undefined
+      ? { maxThinkingTokens: config.maxThinkingTokens }
+      : {}),
+    ...(config.mcpServers ? { mcpServers: config.mcpServers as Options['mcpServers'] } : {}),
+    ...(config.hooks ? { hooks: config.hooks as Options['hooks'] } : {}),
   };
 }
 
@@ -304,6 +324,11 @@ export function createSuggestionsOptions(config: CreateSdkOptionsConfig): Option
     ...claudeMdOptions,
     ...(config.abortController && { abortController: config.abortController }),
     ...(config.outputFormat && { outputFormat: config.outputFormat }),
+    ...(config.maxThinkingTokens !== undefined
+      ? { maxThinkingTokens: config.maxThinkingTokens }
+      : {}),
+    ...(config.mcpServers ? { mcpServers: config.mcpServers as Options['mcpServers'] } : {}),
+    ...(config.hooks ? { hooks: config.hooks as Options['hooks'] } : {}),
   };
 }
 
@@ -339,6 +364,12 @@ export function createChatOptions(config: CreateSdkOptionsConfig): Options {
     },
     ...claudeMdOptions,
     ...(config.abortController && { abortController: config.abortController }),
+    ...(config.outputFormat && { outputFormat: config.outputFormat }),
+    ...(config.maxThinkingTokens !== undefined
+      ? { maxThinkingTokens: config.maxThinkingTokens }
+      : {}),
+    ...(config.mcpServers ? { mcpServers: config.mcpServers as Options['mcpServers'] } : {}),
+    ...(config.hooks ? { hooks: config.hooks as Options['hooks'] } : {}),
   };
 }
 
@@ -371,6 +402,12 @@ export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
     },
     ...claudeMdOptions,
     ...(config.abortController && { abortController: config.abortController }),
+    ...(config.outputFormat && { outputFormat: config.outputFormat }),
+    ...(config.maxThinkingTokens !== undefined
+      ? { maxThinkingTokens: config.maxThinkingTokens }
+      : {}),
+    ...(config.mcpServers ? { mcpServers: config.mcpServers as Options['mcpServers'] } : {}),
+    ...(config.hooks ? { hooks: config.hooks as Options['hooks'] } : {}),
   };
 }
 
@@ -402,5 +439,11 @@ export function createCustomOptions(
     ...(config.sandbox && { sandbox: config.sandbox }),
     ...claudeMdOptions,
     ...(config.abortController && { abortController: config.abortController }),
+    ...(config.outputFormat && { outputFormat: config.outputFormat }),
+    ...(config.maxThinkingTokens !== undefined
+      ? { maxThinkingTokens: config.maxThinkingTokens }
+      : {}),
+    ...(config.mcpServers ? { mcpServers: config.mcpServers as Options['mcpServers'] } : {}),
+    ...(config.hooks ? { hooks: config.hooks as Options['hooks'] } : {}),
   };
 }

@@ -7,12 +7,14 @@ import {
   DEFAULT_GLOBAL_SETTINGS,
   DEFAULT_CREDENTIALS,
   DEFAULT_PROJECT_SETTINGS,
+  DEFAULT_NPM_SECURITY_SETTINGS,
   SETTINGS_VERSION,
   CREDENTIALS_VERSION,
   PROJECT_SETTINGS_VERSION,
   type GlobalSettings,
   type Credentials,
   type ProjectSettings,
+  type NpmSecuritySettings,
 } from '@/types/settings.js';
 
 describe('settings-service.ts', () => {
@@ -606,6 +608,331 @@ describe('settings-service.ts', () => {
 
       await fs.chmod(readOnlyDir, 0o755);
       await fs.rm(readOnlyDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('getNpmSecuritySettings', () => {
+    it('should return default npm security settings when not configured', async () => {
+      const settings = await settingsService.getNpmSecuritySettings(testProjectDir);
+      expect(settings).toEqual(DEFAULT_NPM_SECURITY_SETTINGS);
+    });
+
+    it('should return configured npm security settings', async () => {
+      const customSettings: Partial<NpmSecuritySettings> = {
+        dependencyInstallPolicy: 'allow',
+        allowInstallScripts: true,
+      };
+
+      await settingsService.updateProjectSettings(testProjectDir, {
+        npmSecurity: customSettings,
+      });
+
+      const settings = await settingsService.getNpmSecuritySettings(testProjectDir);
+      expect(settings.dependencyInstallPolicy).toBe('allow');
+      expect(settings.allowInstallScripts).toBe(true);
+      // Should still have defaults for other fields
+      expect(settings.allowedPackagesForRebuild).toEqual([]);
+      expect(settings.enableAuditLog).toBe(true);
+      expect(settings.auditLogRetentionDays).toBe(30);
+    });
+  });
+
+  describe('updateNpmSecuritySettings', () => {
+    it('should update npm security settings', async () => {
+      const updates: Partial<NpmSecuritySettings> = {
+        dependencyInstallPolicy: 'prompt',
+        allowInstallScripts: true,
+        allowedPackagesForRebuild: ['node-gyp', 'bcrypt'],
+      };
+
+      const updated = await settingsService.updateNpmSecuritySettings(testProjectDir, updates);
+
+      expect(updated.dependencyInstallPolicy).toBe('prompt');
+      expect(updated.allowInstallScripts).toBe(true);
+      expect(updated.allowedPackagesForRebuild).toEqual(['node-gyp', 'bcrypt']);
+      expect(updated.enableAuditLog).toBe(true);
+      expect(updated.auditLogRetentionDays).toBe(30);
+    });
+
+    it('should merge with existing npm security settings', async () => {
+      // Set initial settings
+      await settingsService.updateNpmSecuritySettings(testProjectDir, {
+        dependencyInstallPolicy: 'strict',
+        allowedPackagesForRebuild: ['node-gyp'],
+      });
+
+      // Update only policy
+      const updated = await settingsService.updateNpmSecuritySettings(testProjectDir, {
+        dependencyInstallPolicy: 'allow',
+      });
+
+      expect(updated.dependencyInstallPolicy).toBe('allow');
+      expect(updated.allowedPackagesForRebuild).toEqual(['node-gyp']); // Preserved
+    });
+  });
+
+  describe('setAllowInstallScripts', () => {
+    it('should set allowInstallScripts to true', async () => {
+      await settingsService.setAllowInstallScripts(testProjectDir, true);
+
+      const settings = await settingsService.getNpmSecuritySettings(testProjectDir);
+      expect(settings.allowInstallScripts).toBe(true);
+    });
+
+    it('should set allowInstallScripts to false', async () => {
+      await settingsService.setAllowInstallScripts(testProjectDir, false);
+
+      const settings = await settingsService.getNpmSecuritySettings(testProjectDir);
+      expect(settings.allowInstallScripts).toBe(false);
+    });
+  });
+
+  describe('setDependencyInstallPolicy', () => {
+    it('should set policy to strict', async () => {
+      await settingsService.setDependencyInstallPolicy(testProjectDir, 'strict');
+
+      const settings = await settingsService.getNpmSecuritySettings(testProjectDir);
+      expect(settings.dependencyInstallPolicy).toBe('strict');
+    });
+
+    it('should set policy to prompt', async () => {
+      await settingsService.setDependencyInstallPolicy(testProjectDir, 'prompt');
+
+      const settings = await settingsService.getNpmSecuritySettings(testProjectDir);
+      expect(settings.dependencyInstallPolicy).toBe('prompt');
+    });
+
+    it('should set policy to allow', async () => {
+      await settingsService.setDependencyInstallPolicy(testProjectDir, 'allow');
+
+      const settings = await settingsService.getNpmSecuritySettings(testProjectDir);
+      expect(settings.dependencyInstallPolicy).toBe('allow');
+    });
+  });
+
+  describe('logNpmSecurityAudit', () => {
+    it('should log an npm security audit entry', async () => {
+      await settingsService.logNpmSecurityAudit({
+        projectPath: testProjectDir,
+        eventType: 'command-blocked',
+        command: {
+          original: 'npm install',
+          type: 'install',
+          packageManager: 'npm',
+          isInstallCommand: true,
+          isHighRiskExecute: false,
+          requiresApproval: true,
+          riskLevel: 'medium',
+        },
+      });
+
+      const auditPath = path.join(testProjectDir, '.automaker', 'npm-security-audit.jsonl');
+      const content = await fs.readFile(auditPath, 'utf-8');
+      const lines = content.trim().split('\n');
+
+      expect(lines.length).toBe(1);
+      const entry = JSON.parse(lines[0]);
+      expect(entry.eventType).toBe('command-blocked');
+      expect(entry.command.original).toBe('npm install');
+      expect(entry.id).toBeDefined();
+      expect(entry.timestamp).toBeDefined();
+    });
+
+    it('should append multiple audit entries', async () => {
+      await settingsService.logNpmSecurityAudit({
+        projectPath: testProjectDir,
+        eventType: 'command-blocked',
+      });
+
+      await settingsService.logNpmSecurityAudit({
+        projectPath: testProjectDir,
+        eventType: 'approval-granted',
+        decision: 'allow-once',
+      });
+
+      const auditPath = path.join(testProjectDir, '.automaker', 'npm-security-audit.jsonl');
+      const content = await fs.readFile(auditPath, 'utf-8');
+      const lines = content.trim().split('\n');
+
+      expect(lines.length).toBe(2);
+      const entry1 = JSON.parse(lines[0]);
+      const entry2 = JSON.parse(lines[1]);
+      expect(entry1.eventType).toBe('command-blocked');
+      expect(entry2.eventType).toBe('approval-granted');
+      expect(entry2.decision).toBe('allow-once');
+    });
+  });
+
+  describe('getNpmSecurityAuditLog', () => {
+    it('should return empty array when no audit log exists', async () => {
+      const entries = await settingsService.getNpmSecurityAuditLog(testProjectDir);
+      expect(entries).toEqual([]);
+    });
+
+    it('should read audit log entries', async () => {
+      await settingsService.logNpmSecurityAudit({
+        projectPath: testProjectDir,
+        eventType: 'command-blocked',
+      });
+
+      await settingsService.logNpmSecurityAudit({
+        projectPath: testProjectDir,
+        eventType: 'approval-granted',
+      });
+
+      const entries = await settingsService.getNpmSecurityAuditLog(testProjectDir);
+      expect(entries.length).toBe(2);
+      expect(entries[0].eventType).toBe('command-blocked');
+      expect(entries[1].eventType).toBe('approval-granted');
+    });
+
+    it('should filter entries by timestamp', async () => {
+      const now = Date.now();
+      await settingsService.logNpmSecurityAudit({
+        projectPath: testProjectDir,
+        eventType: 'command-blocked',
+      });
+
+      // Wait a bit to ensure different timestamps
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      await settingsService.logNpmSecurityAudit({
+        projectPath: testProjectDir,
+        eventType: 'approval-granted',
+      });
+
+      const entries = await settingsService.getNpmSecurityAuditLog(testProjectDir, {
+        since: now + 5,
+      });
+
+      expect(entries.length).toBe(1);
+      expect(entries[0].eventType).toBe('approval-granted');
+    });
+
+    it('should limit number of entries returned', async () => {
+      for (let i = 0; i < 5; i++) {
+        await settingsService.logNpmSecurityAudit({
+          projectPath: testProjectDir,
+          eventType: 'command-blocked',
+        });
+      }
+
+      const entries = await settingsService.getNpmSecurityAuditLog(testProjectDir, {
+        limit: 3,
+      });
+
+      expect(entries.length).toBe(3);
+    });
+
+    it('should handle invalid JSON lines gracefully', async () => {
+      const auditPath = path.join(testProjectDir, '.automaker', 'npm-security-audit.jsonl');
+      const automakerDir = path.join(testProjectDir, '.automaker');
+      await fs.mkdir(automakerDir, { recursive: true });
+
+      // Write valid and invalid lines
+      await fs.writeFile(
+        auditPath,
+        JSON.stringify({
+          id: '1',
+          timestamp: Date.now(),
+          projectPath: testProjectDir,
+          eventType: 'command-blocked',
+        }) +
+          '\n' +
+          'invalid json\n' +
+          JSON.stringify({
+            id: '2',
+            timestamp: Date.now(),
+            projectPath: testProjectDir,
+            eventType: 'approval-granted',
+          }) +
+          '\n',
+        'utf-8'
+      );
+
+      const entries = await settingsService.getNpmSecurityAuditLog(testProjectDir);
+      expect(entries.length).toBe(2); // Should skip invalid line
+      expect(entries[0].id).toBe('1');
+      expect(entries[1].id).toBe('2');
+    });
+  });
+
+  describe('cleanupNpmSecurityAuditLog', () => {
+    it('should remove entries older than retention period', async () => {
+      const oldTimestamp = Date.now() - 40 * 24 * 60 * 60 * 1000; // 40 days ago
+      const recentTimestamp = Date.now() - 10 * 24 * 60 * 60 * 1000; // 10 days ago
+
+      const auditPath = path.join(testProjectDir, '.automaker', 'npm-security-audit.jsonl');
+      const automakerDir = path.join(testProjectDir, '.automaker');
+      await fs.mkdir(automakerDir, { recursive: true });
+
+      await fs.writeFile(
+        auditPath,
+        JSON.stringify({
+          id: '1',
+          timestamp: oldTimestamp,
+          projectPath: testProjectDir,
+          eventType: 'command-blocked',
+        }) +
+          '\n' +
+          JSON.stringify({
+            id: '2',
+            timestamp: recentTimestamp,
+            projectPath: testProjectDir,
+            eventType: 'approval-granted',
+          }) +
+          '\n',
+        'utf-8'
+      );
+
+      const removedCount = await settingsService.cleanupNpmSecurityAuditLog(testProjectDir);
+
+      expect(removedCount).toBe(1);
+
+      const entries = await settingsService.getNpmSecurityAuditLog(testProjectDir);
+      expect(entries.length).toBe(1);
+      expect(entries[0].id).toBe('2');
+    });
+
+    it('should delete audit log when audit logging is disabled', async () => {
+      await settingsService.updateNpmSecuritySettings(testProjectDir, {
+        enableAuditLog: false,
+      });
+
+      await settingsService.logNpmSecurityAudit({
+        projectPath: testProjectDir,
+        eventType: 'command-blocked',
+      });
+
+      const auditPath = path.join(testProjectDir, '.automaker', 'npm-security-audit.jsonl');
+      expect(await fs.stat(auditPath)).toBeDefined();
+
+      await settingsService.cleanupNpmSecurityAuditLog(testProjectDir);
+
+      await expect(fs.stat(auditPath)).rejects.toThrow();
+    });
+
+    it('should return 0 when no entries are removed', async () => {
+      const recentTimestamp = Date.now() - 10 * 24 * 60 * 60 * 1000; // 10 days ago
+
+      const auditPath = path.join(testProjectDir, '.automaker', 'npm-security-audit.jsonl');
+      const automakerDir = path.join(testProjectDir, '.automaker');
+      await fs.mkdir(automakerDir, { recursive: true });
+
+      await fs.writeFile(
+        auditPath,
+        JSON.stringify({
+          id: '1',
+          timestamp: recentTimestamp,
+          projectPath: testProjectDir,
+          eventType: 'command-blocked',
+        }) + '\n',
+        'utf-8'
+      );
+
+      const removedCount = await settingsService.cleanupNpmSecurityAuditLog(testProjectDir);
+
+      expect(removedCount).toBe(0);
     });
   });
 });

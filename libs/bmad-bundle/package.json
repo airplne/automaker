@@ -1,0 +1,22 @@
+{
+  "name": "@automaker/bmad-bundle",
+  "version": "6.0.0-alpha.22",
+  "type": "module",
+  "description": "BMAD resources bundled with AutoMaker (agents, workflows, manifests)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "bundle"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "keywords": [
+    "automaker",
+    "bmad"
+  ],
+  "author": "AutoMaker Team",
+  "license": "SEE LICENSE IN LICENSE"
+}

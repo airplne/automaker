@@ -9,6 +9,7 @@
 
 import { createLogger } from '@automaker/utils';
 import * as secureFs from '../lib/secure-fs.js';
+import { sanitizeCommandForLogging } from '../lib/npm-security-policy.js';
 
 import {
   getGlobalSettingsPath,
@@ -27,15 +28,20 @@ import type {
   TrashedProjectRef,
   BoardBackgroundSettings,
   WorktreeInfo,
+  NpmSecuritySettings,
 } from '../types/settings.js';
 import {
   DEFAULT_GLOBAL_SETTINGS,
   DEFAULT_CREDENTIALS,
   DEFAULT_PROJECT_SETTINGS,
+  DEFAULT_NPM_SECURITY_SETTINGS,
   SETTINGS_VERSION,
   CREDENTIALS_VERSION,
   PROJECT_SETTINGS_VERSION,
 } from '../types/settings.js';
+import type { NpmSecurityAuditEntry } from '@automaker/types';
+import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 const logger = createLogger('SettingsService');
 
@@ -344,6 +350,22 @@ export class SettingsService {
       };
     }
 
+    // Deep merge BMAD settings if provided
+    if (updates.bmad) {
+      updated.bmad = {
+        ...(current.bmad ?? {}),
+        ...updates.bmad,
+      };
+    }
+
+    // Deep merge npm security settings if provided
+    if (updates.npmSecurity) {
+      updated.npmSecurity = {
+        ...(current.npmSecurity ?? {}),
+        ...updates.npmSecurity,
+      };
+    }
+
     await atomicWriteJson(settingsPath, updated);
     logger.info(`Project settings updated for ${projectPath}`);
 
@@ -568,6 +590,238 @@ export class SettingsService {
       };
     }
   }
+
+  // ============================================================================
+  // npm Security Settings
+  // ============================================================================
+
+  /**
+   * Get npm security settings for a project, with defaults applied
+   *
+   * Reads from {projectPath}/.automaker/settings.json. Returns default strict
+   * security settings if not configured. Used by guardrails to enforce policy.
+   *
+   * @param projectPath - Absolute path to project directory
+   * @returns Promise resolving to complete NpmSecuritySettings object
+   */
+  async getNpmSecuritySettings(projectPath: string): Promise<NpmSecuritySettings> {
+    const settings = await this.getProjectSettings(projectPath);
+    return {
+      ...DEFAULT_NPM_SECURITY_SETTINGS,
+      ...settings?.npmSecurity,
+    };
+  }
+
+  /**
+   * Update npm security settings for a project
+   *
+   * Performs a partial update, merging new values with existing settings.
+   * Creates .automaker directory if needed. Updates are written atomically.
+   *
+   * @param projectPath - Absolute path to project directory
+   * @param updates - Partial NpmSecuritySettings to merge
+   * @returns Promise resolving to complete updated NpmSecuritySettings
+   */
+  async updateNpmSecuritySettings(
+    projectPath: string,
+    updates: Partial<NpmSecuritySettings>
+  ): Promise<NpmSecuritySettings> {
+    const current = await this.getNpmSecuritySettings(projectPath);
+    const merged = { ...current, ...updates };
+
+    await this.updateProjectSettings(projectPath, {
+      npmSecurity: merged,
+    });
+
+    return merged;
+  }
+
+  /**
+   * Set install scripts allowance for a project (convenience method)
+   *
+   * Quick toggle for allowing/blocking install scripts. When blocked,
+   * npm install commands are rewritten with --ignore-scripts flag.
+   *
+   * @param projectPath - Absolute path to project directory
+   * @param allow - Whether to allow install scripts (true = allow, false = block)
+   * @returns Promise that resolves when setting is updated
+   */
+  async setAllowInstallScripts(projectPath: string, allow: boolean): Promise<void> {
+    await this.updateNpmSecuritySettings(projectPath, {
+      allowInstallScripts: allow,
+    });
+  }
+
+  /**
+   * Set dependency install policy for a project
+   *
+   * Changes the overall security policy mode:
+   * - strict: Block scripts, require approval for installs
+   * - prompt: Ask before running scripts
+   * - allow: Permit scripts (legacy behavior)
+   *
+   * @param projectPath - Absolute path to project directory
+   * @param policy - Policy mode to set
+   * @returns Promise that resolves when setting is updated
+   */
+  async setDependencyInstallPolicy(
+    projectPath: string,
+    policy: 'strict' | 'prompt' | 'allow'
+  ): Promise<void> {
+    await this.updateNpmSecuritySettings(projectPath, {
+      dependencyInstallPolicy: policy,
+    });
+  }
+
+  // ============================================================================
+  // npm Security Audit Log
+  // ============================================================================
+
+  /**
+   * Log an npm security audit entry
+   *
+   * Appends a security event to the project's audit log stored as JSONL format
+   * in {projectPath}/.automaker/npm-security-audit.jsonl. Each line is a
+   * complete JSON object for easy streaming and analysis.
+   *
+   * @param entry - Audit entry to log (timestamp and ID will be added if missing)
+   * @returns Promise that resolves when entry is written
+   */
+  async logNpmSecurityAudit(entry: Omit<NpmSecurityAuditEntry, 'id' | 'timestamp'>): Promise<void> {
+    // Sanitize command fields before logging
+    const sanitizedEntry = {
+      ...entry,
+      command: entry.command
+        ? {
+            ...entry.command,
+            original: sanitizeCommandForLogging(entry.command.original),
+            rewrittenCommand: entry.command.rewrittenCommand
+              ? sanitizeCommandForLogging(entry.command.rewrittenCommand)
+              : undefined,
+          }
+        : undefined,
+    };
+
+    const fullEntry: NpmSecurityAuditEntry = {
+      id: randomUUID(),
+      timestamp: Date.now(),
+      ...sanitizedEntry,
+    };
+
+    const auditPath = path.join(entry.projectPath, '.automaker', 'npm-security-audit.jsonl');
+
+    try {
+      await ensureAutomakerDir(entry.projectPath);
+      await secureFs.appendFile(auditPath, JSON.stringify(fullEntry) + '\n', 'utf-8');
+      logger.info(`npm security audit logged: ${fullEntry.eventType} for ${entry.projectPath}`);
+    } catch (error) {
+      logger.error('Failed to write npm security audit log:', error);
+      // Don't throw - audit logging is best-effort and shouldn't break the feature
+    }
+  }
+
+  /**
+   * Get npm security audit entries for a project
+   *
+   * Reads the audit log JSONL file and returns matching entries. Supports
+   * filtering by timestamp and limiting result count. Entries are returned
+   * in chronological order (oldest first).
+   *
+   * @param projectPath - Absolute path to project directory
+   * @param options - Optional filters (limit: max entries, since: unix timestamp)
+   * @returns Promise resolving to array of audit entries
+   */
+  async getNpmSecurityAuditLog(
+    projectPath: string,
+    options?: { limit?: number; since?: number }
+  ): Promise<NpmSecurityAuditEntry[]> {
+    const auditPath = path.join(projectPath, '.automaker', 'npm-security-audit.jsonl');
+
+    if (!(await fileExists(auditPath))) {
+      return [];
+    }
+
+    try {
+      const content = (await secureFs.readFile(auditPath, 'utf-8')) as string;
+      const entries = content
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          try {
+            return JSON.parse(line) as NpmSecurityAuditEntry;
+          } catch (e) {
+            logger.warn('Failed to parse audit log line:', e);
+            return null;
+          }
+        })
+        .filter((entry): entry is NpmSecurityAuditEntry => entry !== null)
+        .filter((entry) => !options?.since || entry.timestamp > options.since)
+        .slice(-(options?.limit || 100));
+
+      return entries;
+    } catch (error) {
+      logger.error('Failed to read npm security audit log:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Clear old npm security audit entries based on retention policy
+   *
+   * Removes entries older than the configured retention period. Called
+   * periodically by maintenance tasks to prevent unbounded log growth.
+   *
+   * @param projectPath - Absolute path to project directory
+   * @returns Promise resolving to number of entries removed
+   */
+  async cleanupNpmSecurityAuditLog(projectPath: string): Promise<number> {
+    const settings = await this.getNpmSecuritySettings(projectPath);
+
+    if (!settings.enableAuditLog) {
+      // If audit logging is disabled, delete the log file entirely
+      const auditPath = path.join(projectPath, '.automaker', 'npm-security-audit.jsonl');
+      if (await fileExists(auditPath)) {
+        await secureFs.unlink(auditPath);
+        logger.info(`Deleted npm security audit log for ${projectPath} (audit logging disabled)`);
+      }
+      return 0;
+    }
+
+    const cutoffTime = Date.now() - settings.auditLogRetentionDays * 24 * 60 * 60 * 1000;
+    const allEntries = await this.getNpmSecurityAuditLog(projectPath, {
+      limit: Number.MAX_SAFE_INTEGER,
+    });
+    const keptEntries = allEntries.filter((entry) => entry.timestamp > cutoffTime);
+    const removedCount = allEntries.length - keptEntries.length;
+
+    if (removedCount > 0) {
+      const auditPath = path.join(projectPath, '.automaker', 'npm-security-audit.jsonl');
+      const content = keptEntries.map((entry) => JSON.stringify(entry)).join('\n') + '\n';
+      const tempPath = `${auditPath}.tmp.${Date.now()}`;
+
+      try {
+        await secureFs.writeFile(tempPath, content, 'utf-8');
+        await secureFs.rename(tempPath, auditPath);
+        logger.info(
+          `Cleaned up npm security audit log for ${projectPath}: removed ${removedCount} old entries`
+        );
+      } catch (error) {
+        // Clean up temp file if it exists
+        try {
+          await secureFs.unlink(tempPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+        throw error;
+      }
+    }
+
+    return removedCount;
+  }
+
+  // ============================================================================
+  // Utility
+  // ============================================================================
 
   /**
    * Get the data directory path

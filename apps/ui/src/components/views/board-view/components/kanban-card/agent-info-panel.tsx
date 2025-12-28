@@ -17,6 +17,7 @@ import {
   Circle,
   Loader2,
   Wrench,
+  UserCircle,
 } from 'lucide-react';
 import { getElectronAPI } from '@/lib/electron';
 import { SummaryDialog } from './summary-dialog';
@@ -49,11 +50,15 @@ export function AgentInfoPanel({
   summary,
   isCurrentAutoTask,
 }: AgentInfoPanelProps) {
-  const { kanbanCardDetailLevel } = useAppStore();
+  const { kanbanCardDetailLevel, aiProfiles } = useAppStore();
   const [agentInfo, setAgentInfo] = useState<AgentTaskInfo | null>(null);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
 
   const showAgentInfo = kanbanCardDetailLevel === 'detailed';
+  const selectedProfile = feature.aiProfileId
+    ? aiProfiles.find((p) => p.id === feature.aiProfileId)
+    : null;
+  const personaDisplay = selectedProfile?.name || feature.personaId || selectedProfile?.personaId;
 
   useEffect(() => {
     const loadContext = async () => {
@@ -112,6 +117,12 @@ export function AgentInfoPanel({
             <Cpu className="w-3 h-3" />
             <span className="font-medium">{formatModelName(feature.model ?? DEFAULT_MODEL)}</span>
           </div>
+          {personaDisplay ? (
+            <div className="flex items-center gap-1 text-brand-500/90">
+              <UserCircle className="w-3 h-3" />
+              <span className="font-medium truncate max-w-[180px]">{personaDisplay}</span>
+            </div>
+          ) : null}
           {feature.thinkingLevel && feature.thinkingLevel !== 'none' ? (
             <div className="flex items-center gap-1 text-purple-400">
               <Brain className="w-3 h-3" />

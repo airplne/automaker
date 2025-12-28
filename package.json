@@ -24,7 +24,7 @@
     "dev:server": "npm run build:packages && npm run _dev:server",
     "dev:full": "npm run build:packages && concurrently \"npm run _dev:server\" \"npm run _dev:web\"",
     "build": "npm run build:packages && npm run build --workspace=apps/ui",
-    "build:packages": "npm run build -w @automaker/types && npm run build -w @automaker/platform && npm run build -w @automaker/utils && npm run build -w @automaker/prompts -w @automaker/model-resolver -w @automaker/dependency-resolver && npm run build -w @automaker/git-utils",
+    "build:packages": "npm run build -w @automaker/types && npm run build -w @automaker/platform && npm run build -w @automaker/utils && npm run build -w @automaker/prompts -w @automaker/model-resolver -w @automaker/dependency-resolver && npm run build -w @automaker/git-utils && npm run build -w @automaker/bmad-bundle",
     "build:server": "npm run build:packages && npm run build --workspace=apps/server",
     "build:electron": "npm run build:packages && npm run build:electron --workspace=apps/ui",
     "build:electron:dir": "npm run build:packages && npm run build:electron:dir --workspace=apps/ui",
@@ -57,6 +57,7 @@
     "tree-kill": "^1.2.2"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4"

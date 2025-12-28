@@ -260,7 +260,10 @@ describe('agent-service.ts', () => {
         model: 'claude-sonnet-4-20250514',
       });
 
-      expect(ProviderFactory.getProviderForModel).toHaveBeenCalledWith('claude-sonnet-4-20250514');
+      expect(ProviderFactory.getProviderForModel).toHaveBeenCalledWith(
+        'claude-sonnet-4-20250514',
+        undefined
+      );
     });
 
     it('should save session messages', async () => {

@@ -304,7 +304,10 @@ describe('auto-mode-service.ts (integration)', () => {
       await service.executeFeature(testRepo.path, 'feature-model', false, false);
 
       // Should have used claude-sonnet-4-20250514
-      expect(ProviderFactory.getProviderForModel).toHaveBeenCalledWith('claude-sonnet-4-20250514');
+      expect(ProviderFactory.getProviderForModel).toHaveBeenCalledWith(
+        'claude-sonnet-4-20250514',
+        undefined
+      );
     }, 30000);
   });
 

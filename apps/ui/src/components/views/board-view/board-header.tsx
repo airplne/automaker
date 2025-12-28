@@ -3,13 +3,22 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Plus, Bot, Wand2 } from 'lucide-react';
+import { Plus, Bot, Wand2, Puzzle, Download, ArrowUpCircle } from 'lucide-react';
 import { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
 import { ClaudeUsagePopover } from '@/components/claude-usage-popover';
 import { useAppStore } from '@/store/app-store';
+import { toast } from 'sonner';
+import { getElectronAPI } from '@/lib/electron';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface BoardHeaderProps {
   projectName: string;
+  projectPath: string;
   maxConcurrency: number;
   runningAgentsCount: number;
   onConcurrencyChange: (value: number) => void;
@@ -23,6 +32,7 @@ interface BoardHeaderProps {
 
 export function BoardHeader({
   projectName,
+  projectPath,
   maxConcurrency,
   runningAgentsCount,
   onConcurrencyChange,
@@ -40,6 +50,43 @@ export function BoardHeader({
   const isWindows =
     typeof navigator !== 'undefined' && navigator.platform?.toLowerCase().includes('win');
   const showUsageTracking = !apiKeys.anthropic && !isWindows;
+
+  const handleInitializeBmad = async () => {
+    try {
+      const api = getElectronAPI();
+      const result = await api.bmad?.initialize(projectPath, {
+        artifactsDir: undefined,
+        scaffoldMethodology: false,
+      });
+      if (result?.success) {
+        toast.success('BMAD initialized');
+      } else {
+        toast.error('Failed to initialize BMAD', { description: result?.error || 'Unknown error' });
+      }
+    } catch (e) {
+      toast.error('Failed to initialize BMAD', {
+        description: e instanceof Error ? e.message : 'Unknown error',
+      });
+    }
+  };
+
+  const handleUpgradeBmad = async () => {
+    try {
+      const api = getElectronAPI();
+      const result = await api.bmad?.upgrade(projectPath);
+      if (result?.success) {
+        toast.success('BMAD upgraded', {
+          description: 'Backed up to .automaker/bmad-backups/ before upgrade',
+        });
+      } else {
+        toast.error('Failed to upgrade BMAD', { description: result?.error || 'Unknown error' });
+      }
+    } catch (e) {
+      toast.error('Failed to upgrade BMAD', {
+        description: e instanceof Error ? e.message : 'Unknown error',
+      });
+    }
+  };
 
   return (
     <div className="flex items-center justify-between p-4 border-b border-border bg-glass backdrop-blur-md">
@@ -101,6 +148,25 @@ export function BoardHeader({
           <Wand2 className="w-4 h-4 mr-2" />
           Plan
         </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" data-testid="bmad-menu-button">
+              <Puzzle className="w-4 h-4 mr-2" />
+              BMAD
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem onClick={handleInitializeBmad} data-testid="bmad-initialize-quick">
+              <Download className="w-4 h-4 mr-2" />
+              Initialize BMAD
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleUpgradeBmad} data-testid="bmad-upgrade-quick">
+              <ArrowUpCircle className="w-4 h-4 mr-2" />
+              Upgrade BMAD
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <HotkeyButton
           size="sm"

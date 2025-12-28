@@ -32,8 +32,6 @@ export function initAllowedPaths(): void {
   if (rootDir) {
     allowedRootDirectory = path.resolve(rootDir);
     console.log(`[Security] ✓ ALLOWED_ROOT_DIRECTORY configured: ${allowedRootDirectory}`);
-  } else {
-    console.log('[Security] ⚠️  ALLOWED_ROOT_DIRECTORY not set - allowing access to all paths');
   }
 
   // Load DATA_DIR (appData exception - always allowed)

@@ -11,6 +11,7 @@ import { ApiKeysSection } from './settings-view/api-keys/api-keys-section';
 import { ClaudeUsageSection } from './settings-view/api-keys/claude-usage-section';
 import { ClaudeCliStatus } from './settings-view/cli-status/claude-cli-status';
 import { ClaudeMdSettings } from './settings-view/claude/claude-md-settings';
+import { BmadSection } from './settings-view/bmad/bmad-section';
 import { AIEnhancementSection } from './settings-view/ai-enhancement';
 import { AppearanceSection } from './settings-view/appearance/appearance-section';
 import { TerminalSection } from './settings-view/terminal/terminal-section';
@@ -18,6 +19,7 @@ import { AudioSection } from './settings-view/audio/audio-section';
 import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/keyboard-shortcuts-section';
 import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature-defaults-section';
 import { DangerZoneSection } from './settings-view/danger-zone/danger-zone-section';
+import { NpmSecuritySettings } from './settings-view/npm-security';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
 import type { Project as ElectronProject } from '@/lib/electron';
 
@@ -112,6 +114,8 @@ export function SettingsView() {
             {showUsageTracking && <ClaudeUsageSection />}
           </div>
         );
+      case 'bmad':
+        return <BmadSection projectPath={currentProject?.path ?? null} />;
       case 'ai-enhancement':
         return <AIEnhancementSection />;
       case 'appearance':
@@ -154,6 +158,8 @@ export function SettingsView() {
             onValidationModelChange={setValidationModel}
           />
         );
+      case 'npm-security':
+        return <NpmSecuritySettings />;
       case 'danger':
         return (
           <DangerZoneSection

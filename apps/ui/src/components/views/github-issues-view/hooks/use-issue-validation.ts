@@ -28,7 +28,7 @@ export function useIssueValidation({
   const [cachedValidations, setCachedValidations] = useState<Map<number, StoredValidation>>(
     new Map()
   );
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<globalThis.HTMLAudioElement | null>(null);
   // Refs for stable event handler (avoids re-subscribing on state changes)
   const selectedIssueRef = useRef<GitHubIssue | null>(null);
   const showValidationDialogRef = useRef(false);

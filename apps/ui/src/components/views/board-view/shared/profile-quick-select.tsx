@@ -6,9 +6,10 @@ import { PROFILE_ICONS } from './model-constants';
 
 interface ProfileQuickSelectProps {
   profiles: AIProfile[];
+  selectedProfileId?: string | null;
   selectedModel: AgentModel;
   selectedThinkingLevel: ThinkingLevel;
-  onSelect: (model: AgentModel, thinkingLevel: ThinkingLevel) => void;
+  onSelect: (profile: AIProfile) => void;
   testIdPrefix?: string;
   showManageLink?: boolean;
   onManageLinkClick?: () => void;
@@ -16,6 +17,7 @@ interface ProfileQuickSelectProps {
 
 export function ProfileQuickSelect({
   profiles,
+  selectedProfileId,
   selectedModel,
   selectedThinkingLevel,
   onSelect,
@@ -41,13 +43,14 @@ export function ProfileQuickSelect({
       <div className="grid grid-cols-2 gap-2">
         {profiles.slice(0, 6).map((profile) => {
           const IconComponent = profile.icon ? PROFILE_ICONS[profile.icon] : Brain;
-          const isSelected =
-            selectedModel === profile.model && selectedThinkingLevel === profile.thinkingLevel;
+          const isSelected = selectedProfileId
+            ? selectedProfileId === profile.id
+            : selectedModel === profile.model && selectedThinkingLevel === profile.thinkingLevel;
           return (
             <button
               key={profile.id}
               type="button"
-              onClick={() => onSelect(profile.model, profile.thinkingLevel)}
+              onClick={() => onSelect(profile)}
               className={cn(
                 'flex items-center gap-2 p-2 rounded-lg border text-left transition-all',
                 isSelected

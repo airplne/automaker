@@ -1,14 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn, modelSupportsThinking } from '@/lib/utils';
 import { DialogFooter } from '@/components/ui/dialog';
-import { Brain } from 'lucide-react';
+import { Brain, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AIProfile, AgentModel, ThinkingLevel } from '@/store/app-store';
+import { useBmadPersonas } from '@/hooks/use-bmad-personas';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { CLAUDE_MODELS, THINKING_LEVELS, ICON_OPTIONS } from '../constants';
 import { getProviderFromModel } from '../utils';
 
@@ -27,16 +36,41 @@ export function ProfileForm({
   isEditing,
   hotkeyActive,
 }: ProfileFormProps) {
+  const { personas: bmadPersonas, isLoading: isLoadingPersonas } = useBmadPersonas();
   const [formData, setFormData] = useState({
     name: profile.name || '',
     description: profile.description || '',
     model: profile.model || ('opus' as AgentModel),
     thinkingLevel: profile.thinkingLevel || ('none' as ThinkingLevel),
     icon: profile.icon || 'Brain',
+    personaId: profile.personaId || null,
+    systemPrompt: profile.systemPrompt || '',
   });
+  const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set());
 
   const provider = getProviderFromModel(formData.model);
   const supportsThinking = modelSupportsThinking(formData.model);
+
+  // Initialize agent selection from existing profile (with backward compat)
+  useEffect(() => {
+    if (profile?.agentIds?.length) {
+      setSelectedAgentIds(new Set(profile.agentIds));
+    } else if (profile?.personaId) {
+      setSelectedAgentIds(new Set([profile.personaId]));
+    }
+  }, [profile]);
+
+  const toggleAgentSelection = (agentId: string) => {
+    setSelectedAgentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(agentId)) {
+        next.delete(agentId);
+      } else if (next.size < 4) {
+        next.add(agentId);
+      }
+      return next;
+    });
+  };
 
   const handleModelChange = (model: AgentModel) => {
     setFormData({
@@ -59,6 +93,9 @@ export function ProfileForm({
       provider,
       isBuiltIn: false,
       icon: formData.icon,
+      personaId: formData.personaId || undefined,
+      agentIds: selectedAgentIds.size > 0 ? Array.from(selectedAgentIds) : undefined,
+      systemPrompt: formData.systemPrompt.trim() || undefined,
     });
   };
 
@@ -88,6 +125,125 @@ export function ProfileForm({
             rows={2}
             data-testid="profile-description-input"
           />
+        </div>
+
+        {/* Persona */}
+        <div className="space-y-2">
+          <Label>Persona (optional)</Label>
+          <Select
+            value={formData.personaId ?? 'none'}
+            onValueChange={(value) =>
+              setFormData({ ...formData, personaId: value === 'none' ? null : value })
+            }
+            disabled={isLoadingPersonas}
+          >
+            <SelectTrigger data-testid="profile-persona-select">
+              <SelectValue placeholder={isLoadingPersonas ? 'Loading personas…' : 'Default'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Default</SelectItem>
+              {bmadPersonas.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Assign a BMAD persona (e.g., PM/Architect) to apply a consistent style and role.
+          </p>
+        </div>
+
+        {/* System Prompt */}
+        <div className="space-y-2">
+          <Label htmlFor="profile-system-prompt">System Prompt (optional)</Label>
+          <Textarea
+            id="profile-system-prompt"
+            value={formData.systemPrompt}
+            onChange={(e) => setFormData({ ...formData, systemPrompt: e.target.value })}
+            placeholder="Add extra guardrails or style guidelines..."
+            rows={3}
+            data-testid="profile-system-prompt-input"
+          />
+        </div>
+
+        {/* Default BMAD Agents */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <Label>Default BMAD Agents</Label>
+              <span className="text-xs text-muted-foreground">({selectedAgentIds.size}/4 max)</span>
+            </div>
+            {selectedAgentIds.size > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedAgentIds(new Set())}
+                className="h-7 px-2"
+              >
+                Clear All
+              </Button>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Default agents used when no feature-specific agents are selected.
+          </p>
+
+          {isLoadingPersonas ? (
+            <div className="text-sm text-muted-foreground">Loading agents...</div>
+          ) : bmadPersonas.length > 0 ? (
+            <div className="space-y-1 max-h-[200px] overflow-y-auto border rounded-lg p-2 bg-muted/20">
+              {/* BMM Triad Agents */}
+              <div className="text-xs font-medium text-muted-foreground px-2 py-1">
+                BMM Triad Agents
+              </div>
+              {bmadPersonas
+                .filter((p) =>
+                  [
+                    'bmad:strategist-marketer',
+                    'bmad:technologist-architect',
+                    'bmad:fulfillization-manager',
+                  ].includes(p.id)
+                )
+                .map((agent) => {
+                  const isSelected = selectedAgentIds.has(agent.id);
+                  const isDisabled = !isSelected && selectedAgentIds.size >= 4;
+                  return (
+                    <div
+                      key={agent.id}
+                      className={cn(
+                        'flex items-center gap-2 p-2 rounded-md transition-colors',
+                        isSelected ? 'bg-primary/10' : 'hover:bg-muted/50',
+                        isDisabled && 'opacity-50 cursor-not-allowed'
+                      )}
+                    >
+                      <Checkbox
+                        id={`agent-${agent.id}`}
+                        checked={isSelected}
+                        disabled={isDisabled}
+                        onCheckedChange={() => toggleAgentSelection(agent.id)}
+                      />
+                      <span className="text-base">{agent.icon}</span>
+                      <label
+                        htmlFor={`agent-${agent.id}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {agent.label}
+                      </label>
+                      {isSelected && selectedAgentIds.size > 1 && (
+                        <span className="text-xs text-muted-foreground">
+                          #{Array.from(selectedAgentIds).indexOf(agent.id) + 1}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">No BMAD agents available</div>
+          )}
         </div>
 
         {/* Icon Selection */}

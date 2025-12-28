@@ -10,7 +10,13 @@
  */
 
 import { ProviderFactory } from '../providers/provider-factory.js';
-import type { ExecuteOptions, Feature } from '@automaker/types';
+import type {
+  ExecuteOptions,
+  Feature,
+  PartySynthesisResult,
+  ResolvedPersona,
+  ResolvedAgentCollab,
+} from '@automaker/types';
 import {
   buildPromptWithImages,
   isAbortError,
@@ -31,6 +37,7 @@ import {
   validateWorkingDirectory,
 } from '../lib/sdk-options.js';
 import { FeatureLoader } from './feature-loader.js';
+import { BmadPersonaService } from './bmad-persona-service.js';
 import type { SettingsService } from './settings-service.js';
 import { getAutoLoadClaudeMdSetting, filterClaudeMdFromContext } from '../lib/settings-helpers.js';
 
@@ -216,6 +223,43 @@ After completing all tasks in a phase, output:
 This allows real-time progress tracking during implementation.`,
 };
 
+const PARTY_SYNTHESIS_SCHEMA = {
+  type: 'object',
+  properties: {
+    agents: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'Agent identifier (e.g., "bmad:pm")' },
+          position: { type: 'string', description: "Agent's position or contribution summary" },
+        },
+        required: ['id', 'position'],
+      },
+      description: 'Agents who participated in the synthesis',
+    },
+    consensus: {
+      type: ['string', 'null'],
+      description: 'Synthesized consensus, or null if no agreement',
+    },
+    dissent: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Points of disagreement',
+    },
+    recommendation: {
+      type: 'string',
+      description: 'Final actionable recommendation',
+    },
+    markdownSummary: {
+      type: 'string',
+      description: 'Human-readable markdown summary',
+    },
+  },
+  required: ['agents', 'consensus', 'dissent', 'recommendation', 'markdownSummary'],
+  additionalProperties: false,
+} as const;
+
 /**
  * Parse tasks from generated spec content
  * Looks for the ```tasks code block and extracts task lines
@@ -343,6 +387,7 @@ export class AutoModeService {
   private runningFeatures = new Map<string, RunningFeature>();
   private autoLoop: AutoLoopState | null = null;
   private featureLoader = new FeatureLoader();
+  private bmadPersonaService = new BmadPersonaService();
   private autoLoopRunning = false;
   private autoLoopAbortController: AbortController | null = null;
   private config: AutoModeConfig | null = null;
@@ -578,6 +623,103 @@ export class AutoModeService {
       // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
       const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
 
+      // Resolve BMAD persona + optional profile prompt
+      const projectSettings = this.settingsService
+        ? await this.settingsService.getProjectSettings(projectPath)
+        : null;
+      const bmadArtifactsDir = this.normalizeBmadArtifactsDir(projectSettings?.bmad?.artifactsDir);
+
+      const globalSettings = this.settingsService
+        ? await this.settingsService.getGlobalSettings()
+        : null;
+      const selectedProfile =
+        feature.aiProfileId && globalSettings
+          ? globalSettings.aiProfiles.find((p) => p.id === feature.aiProfileId)
+          : undefined;
+
+      // Determine effective agent IDs with backward compatibility for personaId
+      const effectiveAgentIds = feature.agentIds?.length
+        ? feature.agentIds
+        : feature.personaId // Backward compat
+          ? [feature.personaId]
+          : selectedProfile?.agentIds?.length
+            ? selectedProfile.agentIds
+            : selectedProfile?.personaId
+              ? [selectedProfile.personaId]
+              : undefined;
+
+      let resolvedPersona: ResolvedPersona | null = null;
+      let resolvedCollab: ResolvedAgentCollab | null = null;
+
+      if (effectiveAgentIds && effectiveAgentIds.length > 1) {
+        resolvedCollab = await this.bmadPersonaService.resolveAgentCollab({
+          agentIds: effectiveAgentIds,
+          artifactsDir: `${bmadArtifactsDir} (relative to project root)`,
+          projectPath,
+        });
+      } else if (effectiveAgentIds && effectiveAgentIds.length === 1) {
+        resolvedPersona = await this.bmadPersonaService.resolvePersona({
+          personaId: effectiveAgentIds[0],
+          artifactsDir: `${bmadArtifactsDir} (relative to project root)`,
+          projectPath,
+        });
+      }
+
+      const agentSystemPrompt =
+        resolvedCollab?.combinedSystemPrompt || resolvedPersona?.systemPrompt;
+
+      const baseSystemPrompt = this.getAutoModeBaseSystemPrompt({
+        bmadArtifactsDir,
+      });
+
+      const combinedSystemPrompt = [
+        contextFilesPrompt,
+        agentSystemPrompt,
+        selectedProfile?.systemPrompt,
+        baseSystemPrompt,
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+
+      // Party Mode Synthesis (one-shot)
+      if (effectiveAgentIds?.length === 1 && effectiveAgentIds[0] === 'bmad:party-synthesis') {
+        const model = resolveModelString(
+          resolvedPersona?.model || feature.model,
+          DEFAULT_MODELS.claude
+        );
+        const maxThinkingTokens =
+          resolvedPersona?.thinkingBudget ??
+          this.thinkingLevelToMaxThinkingTokens(feature.thinkingLevel);
+
+        const synthesisPrompt = this.buildPartySynthesisPrompt({ feature });
+
+        await this.runPartySynthesis({
+          projectPath,
+          workDir,
+          feature,
+          featureId,
+          prompt: synthesisPrompt,
+          systemPrompt: combinedSystemPrompt || undefined,
+          model,
+          maxThinkingTokens,
+          autoLoadClaudeMd,
+          bmadArtifactsDir,
+          abortController,
+        });
+
+        const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
+        await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+
+        this.emitAutoModeEvent('auto_mode_feature_complete', {
+          featureId,
+          passes: true,
+          message: `Party synthesis completed${finalStatus === 'verified' ? ' - auto-verified' : ''}`,
+          projectPath,
+        });
+
+        return;
+      }
+
       if (options?.continuationPrompt) {
         // Continuation prompt is used when recovering from a plan approval
         // The plan was already approved, so skip the planning phase
@@ -605,7 +747,13 @@ export class AutoModeService {
       );
 
       // Get model from feature
-      const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
+      const model = resolveModelString(
+        resolvedPersona?.model || feature.model,
+        DEFAULT_MODELS.claude
+      );
+      const maxThinkingTokens =
+        resolvedPersona?.thinkingBudget ??
+        this.thinkingLevelToMaxThinkingTokens(feature.thinkingLevel);
       console.log(`[AutoMode] Executing feature ${featureId} with model: ${model} in ${workDir}`);
 
       // Run the agent with the feature's model and images
@@ -622,8 +770,10 @@ export class AutoModeService {
           projectPath,
           planningMode: feature.planningMode,
           requirePlanApproval: feature.requirePlanApproval,
-          systemPrompt: contextFilesPrompt || undefined,
+          systemPrompt: combinedSystemPrompt || undefined,
           autoLoadClaudeMd,
+          maxThinkingTokens,
+          mcpServers: resolvedPersona?.mcpServers,
         }
       );
 
@@ -783,6 +933,146 @@ export class AutoModeService {
     // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
     const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
 
+    // Resolve BMAD persona + optional profile prompt
+    const projectSettings = this.settingsService
+      ? await this.settingsService.getProjectSettings(projectPath)
+      : null;
+    const bmadArtifactsDir = this.normalizeBmadArtifactsDir(projectSettings?.bmad?.artifactsDir);
+
+    const globalSettings = this.settingsService
+      ? await this.settingsService.getGlobalSettings()
+      : null;
+    const selectedProfile =
+      feature?.aiProfileId && globalSettings
+        ? globalSettings.aiProfiles.find((p) => p.id === feature.aiProfileId)
+        : undefined;
+
+    // Determine effective agent IDs with backward compatibility for personaId
+    const effectiveAgentIds = feature?.agentIds?.length
+      ? feature.agentIds
+      : feature?.personaId // Backward compat
+        ? [feature.personaId]
+        : selectedProfile?.agentIds?.length
+          ? selectedProfile.agentIds
+          : selectedProfile?.personaId
+            ? [selectedProfile.personaId]
+            : undefined;
+
+    let resolvedPersona: ResolvedPersona | null = null;
+    let resolvedCollab: ResolvedAgentCollab | null = null;
+
+    if (effectiveAgentIds && effectiveAgentIds.length > 1) {
+      resolvedCollab = await this.bmadPersonaService.resolveAgentCollab({
+        agentIds: effectiveAgentIds,
+        artifactsDir: `${bmadArtifactsDir} (relative to project root)`,
+        projectPath,
+      });
+    } else if (effectiveAgentIds && effectiveAgentIds.length === 1) {
+      resolvedPersona = await this.bmadPersonaService.resolvePersona({
+        personaId: effectiveAgentIds[0],
+        artifactsDir: `${bmadArtifactsDir} (relative to project root)`,
+        projectPath,
+      });
+    }
+
+    const agentSystemPrompt = resolvedCollab?.combinedSystemPrompt || resolvedPersona?.systemPrompt;
+
+    const baseSystemPrompt = this.getAutoModeBaseSystemPrompt({
+      bmadArtifactsDir,
+    });
+
+    const combinedSystemPrompt = [
+      contextFilesPrompt,
+      agentSystemPrompt,
+      selectedProfile?.systemPrompt,
+      baseSystemPrompt,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    // Party Mode Synthesis follow-up (one-shot)
+    if (
+      effectiveAgentIds?.length === 1 &&
+      effectiveAgentIds[0] === 'bmad:party-synthesis' &&
+      feature
+    ) {
+      this.runningFeatures.set(featureId, {
+        featureId,
+        projectPath,
+        worktreePath,
+        branchName,
+        abortController,
+        isAutoMode: false,
+        startTime: Date.now(),
+      });
+
+      this.emitAutoModeEvent('auto_mode_feature_start', {
+        featureId,
+        projectPath,
+        feature: feature || {
+          id: featureId,
+          title: 'Party Synthesis Follow-up',
+          description: prompt.substring(0, 100),
+        },
+      });
+
+      try {
+        await this.updateFeatureStatus(projectPath, featureId, 'in_progress');
+
+        const model = resolveModelString(
+          resolvedPersona?.model || feature.model,
+          DEFAULT_MODELS.claude
+        );
+        const maxThinkingTokens =
+          resolvedPersona?.thinkingBudget ??
+          this.thinkingLevelToMaxThinkingTokens(feature.thinkingLevel);
+
+        const synthesisPrompt = this.buildPartySynthesisPrompt({
+          feature,
+          previousContext: previousContext || undefined,
+          followUpInstructions: prompt,
+        });
+
+        await this.runPartySynthesis({
+          projectPath,
+          workDir,
+          feature,
+          featureId,
+          prompt: synthesisPrompt,
+          systemPrompt: combinedSystemPrompt || undefined,
+          model,
+          maxThinkingTokens,
+          autoLoadClaudeMd,
+          bmadArtifactsDir,
+          abortController,
+        });
+
+        const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
+        await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+
+        this.emitAutoModeEvent('auto_mode_feature_complete', {
+          featureId,
+          passes: true,
+          message: `Party synthesis follow-up completed${finalStatus === 'verified' ? ' - auto-verified' : ''}`,
+          projectPath,
+        });
+      } catch (error) {
+        const errorInfo = classifyError(error);
+        if (!errorInfo.isCancellation) {
+          this.emitAutoModeEvent('auto_mode_error', {
+            featureId,
+            error: errorInfo.message,
+            errorType: errorInfo.type,
+            projectPath,
+          });
+        }
+      } finally {
+        this.runningFeatures.delete(featureId);
+      }
+
+      return;
+    }
+
     // Build complete prompt with feature info, previous context, and follow-up instructions
     let fullPrompt = `## Follow-up on Feature Implementation
 
@@ -827,7 +1117,13 @@ Address the follow-up instructions above. Review the previous work and make the 
 
     try {
       // Get model from feature (already loaded above)
-      const model = resolveModelString(feature?.model, DEFAULT_MODELS.claude);
+      const model = resolveModelString(
+        resolvedPersona?.model || feature?.model,
+        DEFAULT_MODELS.claude
+      );
+      const maxThinkingTokens =
+        resolvedPersona?.thinkingBudget ??
+        this.thinkingLevelToMaxThinkingTokens(feature?.thinkingLevel);
       console.log(`[AutoMode] Follow-up for feature ${featureId} using model: ${model}`);
 
       // Update feature status to in_progress
@@ -909,8 +1205,10 @@ Address the follow-up instructions above. Review the previous work and make the 
           projectPath,
           planningMode: 'skip', // Follow-ups don't require approval
           previousContent: previousContext || undefined,
-          systemPrompt: contextFilesPrompt || undefined,
+          systemPrompt: combinedSystemPrompt || undefined,
           autoLoadClaudeMd,
+          maxThinkingTokens,
+          mcpServers: resolvedPersona?.mcpServers,
         }
       );
 
@@ -1122,7 +1420,10 @@ Format your response as a structured markdown document.`;
     try {
       // Use default Claude model for analysis (can be overridden in the future)
       const analysisModel = resolveModelString(undefined, DEFAULT_MODELS.claude);
-      const provider = ProviderFactory.getProviderForModel(analysisModel);
+      const provider = ProviderFactory.getProviderForModel(
+        analysisModel,
+        this.settingsService ?? undefined
+      );
 
       // Load autoLoadClaudeMd setting
       const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
@@ -1739,6 +2040,201 @@ This helps parse your summary correctly in the output logs.`;
     return prompt;
   }
 
+  private buildPartySynthesisPrompt(params: {
+    feature: Feature;
+    followUpInstructions?: string;
+    previousContext?: string;
+  }): string {
+    const title =
+      params.feature.title?.trim() || this.extractTitleFromDescription(params.feature.description);
+
+    const parts = [
+      `You are running Party Mode Synthesis.`,
+      `Simulate a short internal deliberation between multiple expert personas and return a single synthesized recommendation.`,
+      ``,
+      `## Task`,
+      `**Title:** ${title || params.feature.id}`,
+      `**Description:**`,
+      params.feature.description,
+      params.feature.spec ? `\n\n**Specification:**\n${params.feature.spec}` : undefined,
+      params.previousContext ? `\n\n## Previous Context\n${params.previousContext}\n` : undefined,
+      params.followUpInstructions
+        ? `\n\n## Follow-up Request\n${params.followUpInstructions}\n`
+        : undefined,
+      ``,
+      `## Output Requirements`,
+      `- Output MUST conform to the provided JSON schema.`,
+      `- Choose 3-6 relevant agents/personas for \`agents\` (e.g., John, Mary, Winston, BMad Master).`,
+      `- For each participating agent, return an object with:`,
+      `  - id: the agent's persona identifier (e.g., "bmad:pm", "bmad:architect")`,
+      `  - position: a 1-2 sentence summary of that agent's stance or contribution`,
+      `- If agents cannot reach consensus, set consensus to null (not an empty string).`,
+      `- Be concise, specific, and actionable.`,
+      `- \`markdownSummary\` should be human-readable Markdown with headings and bullets.`,
+    ].filter(Boolean);
+
+    return parts.join('\n');
+  }
+
+  private async runPartySynthesis(params: {
+    projectPath: string;
+    workDir: string;
+    feature: Feature;
+    featureId: string;
+    prompt: string;
+    systemPrompt?: string;
+    model: string;
+    maxThinkingTokens?: number;
+    autoLoadClaudeMd: boolean;
+    bmadArtifactsDir: string;
+    abortController: AbortController;
+  }): Promise<PartySynthesisResult> {
+    const sdkOptions = createCustomOptions({
+      cwd: params.workDir,
+      model: params.model,
+      systemPrompt: params.systemPrompt,
+      maxTurns: 80,
+      allowedTools: ['Read', 'Glob', 'Grep'],
+      sandbox: { enabled: true, autoAllowBashIfSandboxed: true },
+      outputFormat: { type: 'json_schema', schema: PARTY_SYNTHESIS_SCHEMA },
+      maxThinkingTokens: params.maxThinkingTokens,
+      abortController: params.abortController,
+      autoLoadClaudeMd: params.autoLoadClaudeMd,
+    });
+
+    const provider = ProviderFactory.getProviderForModel(
+      sdkOptions.model!,
+      this.settingsService ?? undefined
+    );
+
+    const executeOptions: ExecuteOptions = {
+      prompt: params.prompt,
+      model: sdkOptions.model!,
+      cwd: params.workDir,
+      systemPrompt: sdkOptions.systemPrompt,
+      settingSources: sdkOptions.settingSources,
+      maxTurns: sdkOptions.maxTurns,
+      allowedTools: sdkOptions.allowedTools as string[] | undefined,
+      maxThinkingTokens: sdkOptions.maxThinkingTokens,
+      outputFormat: sdkOptions.outputFormat as ExecuteOptions['outputFormat'],
+      abortController: params.abortController,
+    };
+
+    const stream = provider.executeQuery(executeOptions);
+    let structured: PartySynthesisResult | null = null;
+    let responseText = '';
+
+    for await (const msg of stream) {
+      if (msg.type === 'assistant' && msg.message?.content) {
+        for (const block of msg.message.content) {
+          if (block.type === 'text') {
+            responseText += block.text || '';
+          }
+        }
+      }
+
+      if (msg.type === 'result' && (msg as any).subtype === 'success') {
+        const anyMsg = msg as any;
+        if (anyMsg.structured_output) {
+          structured = anyMsg.structured_output as PartySynthesisResult;
+        }
+      }
+
+      if (msg.type === 'result' && (msg as any).subtype === 'error_max_structured_output_retries') {
+        throw new Error('Could not produce valid party synthesis structured output');
+      }
+    }
+
+    if (!structured) {
+      // Fallback: attempt to parse raw text as JSON (best-effort)
+      try {
+        structured = JSON.parse(responseText) as PartySynthesisResult;
+      } catch {
+        throw new Error('Party synthesis did not return structured output');
+      }
+    }
+
+    const ordered: PartySynthesisResult = {
+      agents: structured.agents,
+      consensus: structured.consensus,
+      dissent: structured.dissent,
+      recommendation: structured.recommendation,
+      markdownSummary: structured.markdownSummary,
+    };
+
+    // Persist artifacts (deterministic filenames)
+    const synthesisDir = path.join(params.projectPath, params.bmadArtifactsDir, 'party-synthesis');
+    await secureFs.mkdir(synthesisDir, { recursive: true });
+    const synthesisJsonPath = path.join(synthesisDir, `${params.featureId}.json`);
+    await secureFs.writeFile(synthesisJsonPath, `${JSON.stringify(ordered, null, 2)}\n`, 'utf-8');
+
+    const featureDir = getFeatureDir(params.projectPath, params.featureId);
+    await secureFs.mkdir(featureDir, { recursive: true });
+    const agentOutputPath = path.join(featureDir, 'agent-output.md');
+
+    let existing = '';
+    try {
+      existing = (await secureFs.readFile(agentOutputPath, 'utf-8')) as string;
+    } catch {
+      // No existing output
+    }
+
+    const title =
+      params.feature.title?.trim() || this.extractTitleFromDescription(params.feature.description);
+    const date = new Date().toISOString().slice(0, 10);
+    const header = [
+      `---`,
+      `## Party Synthesis: ${title || params.featureId}`,
+      `**Date:** ${date} | **Agents:** ${ordered.agents.map((a) => a.id.replace('bmad:', '')).join(', ')}`,
+      `---`,
+      ``,
+    ].join('\n');
+
+    const appended = `${header}${(ordered.markdownSummary || '').trim()}\n`;
+    const nextContent =
+      existing.trim().length > 0 ? `${existing.trimEnd()}\n\n${appended}` : appended;
+    await secureFs.writeFile(agentOutputPath, nextContent, 'utf-8');
+
+    return ordered;
+  }
+
+  private getAutoModeBaseSystemPrompt(params: { bmadArtifactsDir: string }): string {
+    return [
+      `You are running inside the AutoMaker Auto Mode execution engine.`,
+      `Respect project context files and existing codebase conventions.`,
+      `Do not directly edit feature metadata under .automaker/features/* (managed by AutoMaker).`,
+      `If you create BMAD artifacts, write them as text files under: ${params.bmadArtifactsDir} (relative to project root).`,
+      `Keep artifacts git-friendly: no binaries, stable filenames when possible, and predictable formatting.`,
+    ].join('\n');
+  }
+
+  private normalizeBmadArtifactsDir(input: string | undefined | null): string {
+    const trimmed = (input ?? '').trim();
+    if (!trimmed) return '.automaker/bmad-output';
+
+    // Enforce project-relative paths (no absolute paths or traversal).
+    if (path.isAbsolute(trimmed) || trimmed.includes('..')) {
+      return '.automaker/bmad-output';
+    }
+
+    return trimmed.replaceAll('\\', '/').replace(/^\/+/, '');
+  }
+
+  private thinkingLevelToMaxThinkingTokens(thinkingLevel?: string): number | undefined {
+    switch (thinkingLevel) {
+      case 'low':
+        return 1024;
+      case 'medium':
+        return 4096;
+      case 'high':
+        return 8192;
+      case 'ultrathink':
+        return 16000;
+      default:
+        return undefined;
+    }
+  }
+
   private async runAgent(
     workDir: string,
     featureId: string,
@@ -1753,6 +2249,10 @@ This helps parse your summary correctly in the output logs.`;
       requirePlanApproval?: boolean;
       previousContent?: string;
       systemPrompt?: string;
+      maxThinkingTokens?: number;
+      outputFormat?: ExecuteOptions['outputFormat'];
+      mcpServers?: ExecuteOptions['mcpServers'];
+      hooks?: ExecuteOptions['hooks'];
       autoLoadClaudeMd?: boolean;
     }
   ): Promise<void> {
@@ -1837,6 +2337,11 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     const sdkOptions = createAutoModeOptions({
       cwd: workDir,
       model: model,
+      systemPrompt: options?.systemPrompt,
+      outputFormat: options?.outputFormat,
+      maxThinkingTokens: options?.maxThinkingTokens,
+      mcpServers: options?.mcpServers,
+      hooks: options?.hooks,
       abortController,
       autoLoadClaudeMd,
     });
@@ -1850,10 +2355,29 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       `[AutoMode] runAgent called for feature ${featureId} with model: ${finalModel}, planningMode: ${planningMode}, requiresApproval: ${requiresApproval}`
     );
 
-    // Get provider for this model
-    const provider = ProviderFactory.getProviderForModel(finalModel);
+    // Execution model/provider (used for implementation tasks)
+    const executionModel = finalModel;
+    const executionProvider = ProviderFactory.getProviderForModel(
+      executionModel,
+      this.settingsService ?? undefined
+    );
 
-    console.log(`[AutoMode] Using provider "${provider.getName()}" for model "${finalModel}"`);
+    // Optional: separate model/provider for planning/spec generation (high-level, code-blind if desired)
+    const plannerOverride = process.env.AUTOMAKER_MODEL_PLANNER?.trim();
+    const plannerModel = plannerOverride
+      ? resolveModelString(plannerOverride, DEFAULT_MODELS.claude)
+      : executionModel;
+
+    const useSeparatePlanner =
+      planningModeRequiresApproval && plannerModel.toLowerCase() !== executionModel.toLowerCase();
+
+    const planningProvider = useSeparatePlanner
+      ? ProviderFactory.getProviderForModel(plannerModel, this.settingsService ?? undefined)
+      : executionProvider;
+
+    console.log(
+      `[AutoMode] Planning model: ${useSeparatePlanner ? plannerModel : executionModel} (provider "${planningProvider.getName()}"), execution model: ${executionModel} (provider "${executionProvider.getName()}")`
+    );
 
     // Build prompt content with images using utility
     const { content: promptContent } = await buildPromptWithImages(
@@ -1872,17 +2396,49 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
 
     const executeOptions: ExecuteOptions = {
       prompt: promptContent,
-      model: finalModel,
+      model: executionModel,
+      maxThinkingTokens: sdkOptions.maxThinkingTokens,
+      outputFormat: sdkOptions.outputFormat as ExecuteOptions['outputFormat'],
       maxTurns: maxTurns,
       cwd: workDir,
       allowedTools: allowedTools,
+      mcpServers: sdkOptions.mcpServers as ExecuteOptions['mcpServers'],
+      hooks: sdkOptions.hooks as ExecuteOptions['hooks'],
       abortController,
       systemPrompt: sdkOptions.systemPrompt,
       settingSources: sdkOptions.settingSources,
     };
 
-    // Execute via provider
-    const stream = provider.executeQuery(executeOptions);
+    // If we're using a separate planner, optionally restrict tools + inject a repo map (paths only).
+    const parseToolCsv = (value?: string): string[] =>
+      (value || '')
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+    const planningAllowedTools = useSeparatePlanner
+      ? parseToolCsv(process.env.AUTOMAKER_PLANNER_ALLOWED_TOOLS)
+      : (allowedTools ?? []);
+
+    const planningPrompt: ExecuteOptions['prompt'] = useSeparatePlanner
+      ? this.prependPlannerContextToPrompt(promptContent, {
+          repoMap: await this.buildRepoMapForPlanner(workDir),
+          allowedTools: planningAllowedTools,
+          plannerModel,
+          executionModel,
+        })
+      : promptContent;
+
+    const initialProvider = useSeparatePlanner ? planningProvider : executionProvider;
+    const initialModel = useSeparatePlanner ? plannerModel : executionModel;
+
+    // Execute initial call (planning/spec generation or full execution when planning is skipped)
+    const stream = initialProvider.executeQuery({
+      ...executeOptions,
+      prompt: planningPrompt,
+      model: initialModel,
+      allowedTools: planningAllowedTools,
+    });
     // Initialize with previous content if this is a follow-up, with a separator
     let responseText = previousContent
       ? `${previousContent}\n\n---\n\n## Follow-up Session\n\n`
@@ -2098,13 +2654,20 @@ After generating the revised spec, output:
                         version: planVersion,
                       });
 
-                      // Make revision call
-                      const revisionStream = provider.executeQuery({
-                        prompt: revisionPrompt,
-                        model: finalModel,
+                      // Make revision call (use planner when configured)
+                      const revisionStream = planningProvider.executeQuery({
+                        prompt: useSeparatePlanner
+                          ? this.prependPlannerContextToPrompt(revisionPrompt, {
+                              repoMap: await this.buildRepoMapForPlanner(workDir),
+                              allowedTools: planningAllowedTools,
+                              plannerModel,
+                              executionModel,
+                            })
+                          : revisionPrompt,
+                        model: initialModel,
                         maxTurns: maxTurns || 100,
                         cwd: workDir,
-                        allowedTools: allowedTools,
+                        allowedTools: planningAllowedTools,
                         abortController,
                       });
 
@@ -2236,9 +2799,9 @@ After generating the revised spec, output:
                   );
 
                   // Execute task with dedicated agent
-                  const taskStream = provider.executeQuery({
+                  const taskStream = executionProvider.executeQuery({
                     prompt: taskPrompt,
-                    model: finalModel,
+                    model: executionModel,
                     maxTurns: Math.min(maxTurns || 100, 50), // Limit turns per task
                     cwd: workDir,
                     allowedTools: allowedTools,
@@ -2325,9 +2888,9 @@ ${approvedPlanContent}
 
 Implement all the changes described in the plan above.`;
 
-                const continuationStream = provider.executeQuery({
+                const continuationStream = executionProvider.executeQuery({
                   prompt: continuationPrompt,
-                  model: finalModel,
+                  model: executionModel,
                   maxTurns: maxTurns,
                   cwd: workDir,
                   allowedTools: allowedTools,
@@ -2510,6 +3073,104 @@ ${planContent}
 Begin implementing task ${task.id} now.`;
 
     return prompt;
+  }
+
+  private async buildRepoMapForPlanner(workDir: string): Promise<string> {
+    try {
+      const { stdout } = await execAsync('git ls-files --cached --others --exclude-standard', {
+        cwd: workDir,
+        timeout: 30_000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+
+      const files = stdout
+        .split('\n')
+        .map((l) => l.trim().replace(/\\/g, '/'))
+        .filter(Boolean);
+
+      if (files.length === 0) {
+        return '(no tracked/untracked files found)';
+      }
+
+      const rootFiles: string[] = [];
+      const byTopDir = new Map<string, { count: number; samples: string[] }>();
+
+      for (const file of files) {
+        const parts = file.split('/');
+        if (parts.length === 1) {
+          rootFiles.push(file);
+          continue;
+        }
+        const top = `${parts[0]}/`;
+        const entry = byTopDir.get(top) || { count: 0, samples: [] };
+        entry.count += 1;
+        if (entry.samples.length < 8) entry.samples.push(file);
+        byTopDir.set(top, entry);
+      }
+
+      const topDirs = Array.from(byTopDir.entries()).sort((a, b) => b[1].count - a[1].count);
+
+      const lines: string[] = [];
+      if (rootFiles.length > 0) {
+        lines.push(
+          `Root files (${rootFiles.length}): ${rootFiles.slice(0, 25).join(', ')}${rootFiles.length > 25 ? ', ...' : ''}`
+        );
+        lines.push('');
+      }
+
+      lines.push('Top directories (paths only):');
+      for (const [dir, info] of topDirs.slice(0, 12)) {
+        const samples = info.samples.join(', ');
+        lines.push(`- ${dir} (${info.count} files) e.g., ${samples}`);
+      }
+
+      const mapText = lines.join('\n').trim();
+      return mapText.length > 20_000 ? `${mapText.slice(0, 20_000)}\n\n[TRUNCATED]` : mapText;
+    } catch (error) {
+      return `Repo map unavailable: ${(error as Error).message}`;
+    }
+  }
+
+  private prependPlannerContextToPrompt(
+    prompt: ExecuteOptions['prompt'],
+    meta: {
+      repoMap: string;
+      allowedTools: string[];
+      plannerModel: string;
+      executionModel: string;
+    }
+  ): ExecuteOptions['prompt'] {
+    const allowed =
+      meta.allowedTools.length > 0 ? meta.allowedTools.join(', ') : '(no tools allowed)';
+    const prefix = `## Planning Context (paths only)
+
+You are generating a plan/specification only. Do NOT implement code in this step.
+
+- Planner model: ${meta.plannerModel}
+- Execution model: ${meta.executionModel}
+- Planner allowed tools: ${allowed}
+
+### Repo Map (paths only)
+${meta.repoMap}
+
+---`;
+
+    if (typeof prompt === 'string') {
+      return `${prefix}\n\n${prompt}`;
+    }
+
+    const blocks = prompt.map((b) => ({ ...b }));
+    const firstTextIndex = blocks.findIndex((b) => b.type === 'text');
+    if (firstTextIndex >= 0) {
+      const existing = blocks[firstTextIndex].text || '';
+      blocks[firstTextIndex] = {
+        ...blocks[firstTextIndex],
+        text: `${prefix}\n\n${existing}`,
+      };
+      return blocks;
+    }
+
+    return [{ type: 'text', text: prefix }, ...blocks];
   }
 
   /**

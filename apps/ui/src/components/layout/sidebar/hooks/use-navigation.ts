@@ -94,18 +94,21 @@ export function useNavigation({
     const allToolsItems: NavItem[] = [
       {
         id: 'spec',
+        to: '/spec',
         label: 'Spec Editor',
         icon: FileText,
         shortcut: shortcuts.spec,
       },
       {
         id: 'context',
+        to: '/context',
         label: 'Context',
         icon: BookOpen,
         shortcut: shortcuts.context,
       },
       {
         id: 'profiles',
+        to: '/profiles',
         label: 'AI Profiles',
         icon: UserCircle,
         shortcut: shortcuts.profiles,
@@ -130,12 +133,14 @@ export function useNavigation({
     const projectItems: NavItem[] = [
       {
         id: 'board',
+        to: '/board',
         label: 'Kanban Board',
         icon: LayoutGrid,
         shortcut: shortcuts.board,
       },
       {
         id: 'agent',
+        to: '/agent',
         label: 'Agent Runner',
         icon: Bot,
         shortcut: shortcuts.agent,
@@ -146,6 +151,7 @@ export function useNavigation({
     if (!hideTerminal) {
       projectItems.push({
         id: 'terminal',
+        to: '/terminal',
         label: 'Terminal',
         icon: Terminal,
         shortcut: shortcuts.terminal,
@@ -170,12 +176,14 @@ export function useNavigation({
         items: [
           {
             id: 'github-issues',
+            to: '/github-issues',
             label: 'Issues',
             icon: CircleDot,
             count: unviewedValidationsCount,
           },
           {
             id: 'github-prs',
+            to: '/github-prs',
             label: 'Pull Requests',
             icon: GitPullRequest,
           },
@@ -242,7 +250,7 @@ export function useNavigation({
           if (item.shortcut) {
             shortcutsList.push({
               key: item.shortcut,
-              action: () => navigate({ to: `/${item.id}` as const }),
+              action: () => navigate({ to: item.to }),
               description: `Navigate to ${item.label}`,
             });
           }

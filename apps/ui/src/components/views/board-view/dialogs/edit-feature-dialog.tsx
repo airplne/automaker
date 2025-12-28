@@ -13,6 +13,7 @@ import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CategoryAutocomplete } from '@/components/ui/category-autocomplete';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DescriptionImageDropZone,
   FeatureImagePath as DescriptionImagePath,
@@ -26,10 +27,12 @@ import {
   Sparkles,
   ChevronDown,
   GitBranch,
+  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
-import { modelSupportsThinking } from '@/lib/utils';
+import { modelSupportsThinking, cn } from '@/lib/utils';
+import { useBmadPersonas } from '@/hooks/use-bmad-personas';
 import {
   Feature,
   AgentModel,
@@ -55,6 +58,58 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DependencyTreeDialog } from './dependency-tree-dialog';
 
+const normalizeThinkingLevel = (value: unknown): ThinkingLevel => {
+  if (
+    value === 'none' ||
+    value === 'low' ||
+    value === 'medium' ||
+    value === 'high' ||
+    value === 'ultrathink'
+  ) {
+    return value;
+  }
+  return 'none';
+};
+
+const normalizeImagePaths = (paths: Feature['imagePaths'] | undefined): DescriptionImagePath[] => {
+  if (!paths) return [];
+
+  const normalized: DescriptionImagePath[] = [];
+  for (const item of paths) {
+    if (typeof item === 'string') {
+      const filename = item.split('/').pop() ?? item;
+      normalized.push({
+        id: item,
+        path: item,
+        filename,
+        mimeType: 'image/*',
+      });
+      continue;
+    }
+
+    if (!item || typeof item !== 'object') continue;
+
+    const rec = item as Record<string, unknown>;
+    const path = rec.path;
+    if (typeof path !== 'string') continue;
+
+    const id = typeof rec.id === 'string' ? (rec.id as string) : path;
+    const filename =
+      typeof rec.filename === 'string' ? (rec.filename as string) : (path.split('/').pop() ?? path);
+    const mimeType = typeof rec.mimeType === 'string' ? (rec.mimeType as string) : 'image/*';
+
+    normalized.push({
+      ...rec,
+      id,
+      path,
+      filename,
+      mimeType,
+    } as DescriptionImagePath);
+  }
+
+  return normalized;
+};
+
 interface EditFeatureDialogProps {
   feature: Feature | null;
   onClose: () => void;
@@ -67,6 +122,8 @@ interface EditFeatureDialogProps {
       skipTests: boolean;
       model: AgentModel;
       thinkingLevel: ThinkingLevel;
+      aiProfileId?: string | null;
+      agentIds?: string[];
       imagePaths: DescriptionImagePath[];
       textFilePaths: DescriptionTextFilePath[];
       branchName: string; // Can be empty string to use current branch
@@ -116,9 +173,14 @@ export function EditFeatureDialog({
   const [requirePlanApproval, setRequirePlanApproval] = useState(
     feature?.requirePlanApproval ?? false
   );
+  const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set());
 
   // Get enhancement model and worktrees setting from store
   const { enhancementModel, useWorktrees } = useAppStore();
+
+  const { personas: bmadPersonas, isLoading: isLoadingPersonas } = useBmadPersonas({
+    enabled: !!feature,
+  });
 
   useEffect(() => {
     setEditingFeature(feature);
@@ -127,11 +189,34 @@ export function EditFeatureDialog({
       setRequirePlanApproval(feature.requirePlanApproval ?? false);
       // If feature has no branchName, default to using current branch
       setUseCurrentBranch(!feature.branchName);
+
+      // Load existing agents with backward compatibility
+      if (feature.agentIds?.length) {
+        setSelectedAgentIds(new Set(feature.agentIds));
+      } else if (feature.personaId) {
+        // Backward compat: convert single personaId to array
+        setSelectedAgentIds(new Set([feature.personaId]));
+      } else {
+        setSelectedAgentIds(new Set());
+      }
     } else {
       setEditFeaturePreviewMap(new Map());
       setShowEditAdvancedOptions(false);
+      setSelectedAgentIds(new Set());
     }
   }, [feature]);
+
+  const toggleAgentSelection = (agentId: string) => {
+    setSelectedAgentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(agentId)) {
+        next.delete(agentId);
+      } else if (next.size < 4) {
+        next.add(agentId);
+      }
+      return next;
+    });
+  };
 
   const handleUpdate = () => {
     if (!editingFeature) return;
@@ -150,7 +235,7 @@ export function EditFeatureDialog({
 
     const selectedModel = (editingFeature.model ?? 'opus') as AgentModel;
     const normalizedThinking: ThinkingLevel = modelSupportsThinking(selectedModel)
-      ? (editingFeature.thinkingLevel ?? 'none')
+      ? normalizeThinkingLevel(editingFeature.thinkingLevel)
       : 'none';
 
     // Use current branch if toggle is on
@@ -167,7 +252,9 @@ export function EditFeatureDialog({
       skipTests: editingFeature.skipTests ?? false,
       model: selectedModel,
       thinkingLevel: normalizedThinking,
-      imagePaths: editingFeature.imagePaths ?? [],
+      aiProfileId: editingFeature.aiProfileId ?? null,
+      agentIds: selectedAgentIds.size > 0 ? Array.from(selectedAgentIds) : undefined,
+      imagePaths: normalizeImagePaths(editingFeature.imagePaths),
       textFilePaths: editingFeature.textFilePaths ?? [],
       branchName: finalBranchName,
       priority: editingFeature.priority ?? 2,
@@ -192,16 +279,21 @@ export function EditFeatureDialog({
     setEditingFeature({
       ...editingFeature,
       model,
-      thinkingLevel: modelSupportsThinking(model) ? editingFeature.thinkingLevel : 'none',
+      aiProfileId: undefined,
+      thinkingLevel: modelSupportsThinking(model)
+        ? normalizeThinkingLevel(editingFeature.thinkingLevel)
+        : 'none',
     });
   };
 
-  const handleProfileSelect = (model: AgentModel, thinkingLevel: ThinkingLevel) => {
+  const handleProfileSelect = (profile: AIProfile) => {
     if (!editingFeature) return;
     setEditingFeature({
       ...editingFeature,
-      model,
-      thinkingLevel,
+      model: profile.model,
+      thinkingLevel: profile.thinkingLevel,
+      aiProfileId: profile.id,
+      ...(profile.personaId ? { personaId: profile.personaId } : {}),
     });
   };
 
@@ -288,7 +380,7 @@ export function EditFeatureDialog({
                     description: value,
                   })
                 }
-                images={editingFeature.imagePaths ?? []}
+                images={normalizeImagePaths(editingFeature.imagePaths)}
                 onImagesChange={(images) =>
                   setEditingFeature({
                     ...editingFeature,
@@ -435,11 +527,95 @@ export function EditFeatureDialog({
             {/* Quick Select Profile Section */}
             <ProfileQuickSelect
               profiles={aiProfiles}
-              selectedModel={editingFeature.model ?? 'opus'}
-              selectedThinkingLevel={editingFeature.thinkingLevel ?? 'none'}
+              selectedProfileId={editingFeature.aiProfileId ?? null}
+              selectedModel={(editingFeature.model ?? 'opus') as AgentModel}
+              selectedThinkingLevel={normalizeThinkingLevel(editingFeature.thinkingLevel)}
               onSelect={handleProfileSelect}
               testIdPrefix="edit-profile-quick-select"
             />
+
+            {/* Multi-Agent Selection */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <Label>Add BMAD Agents to Task</Label>
+                  <span className="text-xs text-muted-foreground">
+                    ({selectedAgentIds.size}/4 max)
+                  </span>
+                </div>
+                {selectedAgentIds.size > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => setSelectedAgentIds(new Set())}
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Select multiple agents to collaborate on this task. First selected leads.
+              </p>
+
+              {isLoadingPersonas ? (
+                <div className="text-sm text-muted-foreground p-4 text-center">
+                  Loading agents...
+                </div>
+              ) : (
+                <div className="space-y-1 max-h-[200px] overflow-y-auto border rounded-lg p-2 bg-muted/20">
+                  {/* BMM Triad Agents */}
+                  <div className="text-xs font-medium text-muted-foreground px-2 py-1">
+                    BMM Triad Agents
+                  </div>
+                  {bmadPersonas
+                    .filter((p) =>
+                      [
+                        'bmad:strategist-marketer',
+                        'bmad:technologist-architect',
+                        'bmad:fulfillization-manager',
+                      ].includes(p.id)
+                    )
+                    .map((agent) => {
+                      const isSelected = selectedAgentIds.has(agent.id);
+                      const isDisabled = !isSelected && selectedAgentIds.size >= 4;
+                      const selectionOrder = isSelected
+                        ? Array.from(selectedAgentIds).indexOf(agent.id) + 1
+                        : null;
+
+                      return (
+                        <div
+                          key={agent.id}
+                          className={cn(
+                            'flex items-center gap-2 p-2 rounded-md transition-colors',
+                            isSelected ? 'bg-primary/10' : 'hover:bg-muted/50',
+                            isDisabled && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <Checkbox
+                            id={`edit-agent-${agent.id}`}
+                            checked={isSelected}
+                            disabled={isDisabled}
+                            onCheckedChange={() => toggleAgentSelection(agent.id)}
+                          />
+                          <span className="text-base">{agent.icon}</span>
+                          <label
+                            htmlFor={`edit-agent-${agent.id}`}
+                            className="text-sm cursor-pointer flex-1"
+                          >
+                            {agent.label}
+                          </label>
+                          {selectionOrder && selectedAgentIds.size > 1 && (
+                            <span className="text-xs text-muted-foreground">#{selectionOrder}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
 
             {/* Separator */}
             {aiProfiles.length > 0 && (!showProfilesOnly || showEditAdvancedOptions) && (
@@ -456,11 +632,12 @@ export function EditFeatureDialog({
                 />
                 {editModelAllowsThinking && (
                   <ThinkingLevelSelector
-                    selectedLevel={editingFeature.thinkingLevel ?? 'none'}
+                    selectedLevel={normalizeThinkingLevel(editingFeature.thinkingLevel)}
                     onLevelSelect={(level) =>
                       setEditingFeature({
                         ...editingFeature,
                         thinkingLevel: level,
+                        aiProfileId: undefined,
                       })
                     }
                     testIdPrefix="edit-thinking-level"

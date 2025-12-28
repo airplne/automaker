@@ -25,22 +25,29 @@ export function resolveModelString(
     return defaultModel;
   }
 
+  const trimmed = modelKey.trim();
+  if (!trimmed) {
+    return defaultModel;
+  }
+
+  const lowered = trimmed.toLowerCase();
+
   // Full Claude model string - pass through unchanged
-  if (modelKey.includes('claude-')) {
-    console.log(`[ModelResolver] Using full Claude model string: ${modelKey}`);
-    return modelKey;
+  if (lowered.includes('claude-')) {
+    console.log(`[ModelResolver] Using full Claude model string: ${lowered}`);
+    return lowered;
   }
 
   // Look up Claude model alias
-  const resolved = CLAUDE_MODEL_MAP[modelKey];
+  const resolved = CLAUDE_MODEL_MAP[lowered];
   if (resolved) {
-    console.log(`[ModelResolver] Resolved model alias: "${modelKey}" -> "${resolved}"`);
+    console.log(`[ModelResolver] Resolved model alias: "${lowered}" -> "${resolved}"`);
     return resolved;
   }
 
-  // Unknown model key - use default
-  console.warn(`[ModelResolver] Unknown model key "${modelKey}", using default: "${defaultModel}"`);
-  return defaultModel;
+  // Unknown key: treat as a raw model identifier (enables non-Claude providers like Ollama/OpenAI).
+  console.log(`[ModelResolver] Using raw model string: ${trimmed}`);
+  return trimmed;
 }
 
 /**

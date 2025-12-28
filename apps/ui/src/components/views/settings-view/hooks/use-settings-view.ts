@@ -3,12 +3,14 @@ import { useState, useCallback } from 'react';
 export type SettingsViewId =
   | 'api-keys'
   | 'claude'
+  | 'bmad'
   | 'ai-enhancement'
   | 'appearance'
   | 'terminal'
   | 'keyboard'
   | 'audio'
   | 'defaults'
+  | 'npm-security'
   | 'danger';
 
 interface UseSettingsViewOptions {

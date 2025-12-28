@@ -32,7 +32,11 @@ export function useProjectCreation({
    * Common logic for all project creation flows
    */
   const finalizeProjectCreation = useCallback(
-    async (projectPath: string, projectName: string) => {
+    async (
+      projectPath: string,
+      projectName: string,
+      bmad?: { enabled: boolean; artifactsDir: string; scaffoldMethodology: boolean }
+    ) => {
       try {
         // Initialize .automaker directory structure
         await initializeProject(projectPath);
@@ -63,6 +67,19 @@ export function useProjectCreation({
   </implemented_features>
 </project_specification>`
         );
+
+        // Initialize BMAD (optional)
+        if (bmad?.enabled) {
+          const result = await api.bmad?.initialize(projectPath, {
+            artifactsDir: bmad.artifactsDir,
+            scaffoldMethodology: bmad.scaffoldMethodology,
+          });
+          if (!result?.success) {
+            toast.error('BMAD initialization failed', {
+              description: result?.error || 'Unknown error',
+            });
+          }
+        }
 
         // Determine theme: try trashed project theme, then current project theme, then global
         const trashedProject = trashedProjects.find((p) => p.path === projectPath);
@@ -96,7 +113,11 @@ export function useProjectCreation({
    * Create a blank project with .automaker structure
    */
   const handleCreateBlankProject = useCallback(
-    async (projectName: string, parentDir: string) => {
+    async (
+      projectName: string,
+      parentDir: string,
+      bmad?: { enabled: boolean; artifactsDir: string; scaffoldMethodology: boolean }
+    ) => {
       setIsCreatingProject(true);
       try {
         const api = getElectronAPI();
@@ -106,7 +127,7 @@ export function useProjectCreation({
         await api.mkdir(projectPath);
 
         // Finalize project setup
-        await finalizeProjectCreation(projectPath, projectName);
+        await finalizeProjectCreation(projectPath, projectName, bmad);
       } catch (error) {
         console.error('[ProjectCreation] Failed to create blank project:', error);
         toast.error('Failed to create project', {
@@ -123,7 +144,12 @@ export function useProjectCreation({
    * Create project from a starter template
    */
   const handleCreateFromTemplate = useCallback(
-    async (template: StarterTemplate, projectName: string, parentDir: string) => {
+    async (
+      template: StarterTemplate,
+      projectName: string,
+      parentDir: string,
+      bmad?: { enabled: boolean; artifactsDir: string; scaffoldMethodology: boolean }
+    ) => {
       setIsCreatingProject(true);
       try {
         const api = getElectronAPI();
@@ -163,6 +189,19 @@ export function useProjectCreation({
 </project_specification>`
         );
 
+        // Initialize BMAD (optional)
+        if (bmad?.enabled) {
+          const result = await api.bmad?.initialize(projectPath, {
+            artifactsDir: bmad.artifactsDir,
+            scaffoldMethodology: bmad.scaffoldMethodology,
+          });
+          if (!result?.success) {
+            toast.error('BMAD initialization failed', {
+              description: result?.error || 'Unknown error',
+            });
+          }
+        }
+
         // Determine theme
         const trashedProject = trashedProjects.find((p) => p.path === projectPath);
         const effectiveTheme =
@@ -195,7 +234,12 @@ export function useProjectCreation({
    * Create project from a custom GitHub URL
    */
   const handleCreateFromCustomUrl = useCallback(
-    async (repoUrl: string, projectName: string, parentDir: string) => {
+    async (
+      repoUrl: string,
+      projectName: string,
+      parentDir: string,
+      bmad?: { enabled: boolean; artifactsDir: string; scaffoldMethodology: boolean }
+    ) => {
       setIsCreatingProject(true);
       try {
         const api = getElectronAPI();
@@ -234,6 +278,19 @@ export function useProjectCreation({
   </implemented_features>
 </project_specification>`
         );
+
+        // Initialize BMAD (optional)
+        if (bmad?.enabled) {
+          const result = await api.bmad?.initialize(projectPath, {
+            artifactsDir: bmad.artifactsDir,
+            scaffoldMethodology: bmad.scaffoldMethodology,
+          });
+          if (!result?.success) {
+            toast.error('BMAD initialization failed', {
+              description: result?.error || 'Unknown error',
+            });
+          }
+        }
 
         // Determine theme
         const trashedProject = trashedProjects.find((p) => p.path === projectPath);

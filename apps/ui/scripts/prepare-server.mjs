@@ -28,6 +28,7 @@ const LOCAL_PACKAGES = [
   '@automaker/model-resolver',
   '@automaker/dependency-resolver',
   '@automaker/git-utils',
+  '@automaker/bmad-bundle',
 ];
 
 console.log('🔧 Preparing server for Electron bundling...\n');
@@ -67,6 +68,11 @@ for (const pkgName of LOCAL_PACKAGES) {
   // Copy dist folder
   if (existsSync(join(srcDir, 'dist'))) {
     cpSync(join(srcDir, 'dist'), join(destDir, 'dist'), { recursive: true });
+  }
+
+  // Copy bundled resources (e.g., BMAD workflows/manifests)
+  if (existsSync(join(srcDir, 'bundle'))) {
+    cpSync(join(srcDir, 'bundle'), join(destDir, 'bundle'), { recursive: true });
   }
 
   // Copy package.json

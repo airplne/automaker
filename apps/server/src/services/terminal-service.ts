@@ -10,6 +10,9 @@ import { EventEmitter } from 'events';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('TerminalService');
 
 // Maximum scrollback buffer size (characters)
 const MAX_SCROLLBACK_SIZE = 50000; // ~50KB per terminal
@@ -28,6 +31,38 @@ let maxSessions = parseInt(process.env.TERMINAL_MAX_SESSIONS || '1000', 10);
 // Note: 16ms caused perceived input lag, especially with backspace
 const OUTPUT_THROTTLE_MS = 4; // ~250fps max update rate for responsive input
 const OUTPUT_BATCH_SIZE = 4096; // Smaller batches for lower latency
+
+/**
+ * Get secure environment variables for npm/node operations
+ *
+ * These environment variables enforce security best practices for package manager operations:
+ * - Block lifecycle scripts (install/postinstall) by default to prevent malicious code execution
+ * - Enable security audits to detect known vulnerabilities
+ * - Enforce SSL for package downloads to prevent MITM attacks
+ *
+ * Applies to npm, pnpm, and yarn package managers.
+ *
+ * @returns Record of environment variables for secure npm operations
+ */
+function getSecureNpmEnvironment(): Record<string, string> {
+  return {
+    // npm: Block lifecycle scripts by default
+    npm_config_ignore_scripts: 'true',
+
+    // npm: Enable security audits
+    npm_config_audit: 'true',
+    npm_config_audit_level: 'moderate',
+
+    // npm: Enforce SSL
+    npm_config_strict_ssl: 'true',
+
+    // pnpm: Block lifecycle scripts
+    PNPM_IGNORE_SCRIPTS: 'true',
+
+    // yarn: Block lifecycle scripts (yarn 2+)
+    YARN_ENABLE_SCRIPTS: 'false',
+  };
+}
 
 export interface TerminalSession {
   id: string;
@@ -243,18 +278,30 @@ export class TerminalService extends EventEmitter {
     // Validate and resolve working directory
     const cwd = this.resolveWorkingDirectory(options.cwd);
 
+    // Get secure npm environment defaults
+    const secureEnv = getSecureNpmEnvironment();
+
     // Build environment with some useful defaults
     // These settings ensure consistent terminal behavior across platforms
+    // Order matters: process.env -> secure defaults -> terminal config -> user overrides
     const env: Record<string, string> = {
       ...process.env,
+      ...secureEnv, // Apply npm security hardening
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
       TERM_PROGRAM: 'automaker-terminal',
       // Ensure proper locale for character handling
       LANG: process.env.LANG || 'en_US.UTF-8',
       LC_ALL: process.env.LC_ALL || process.env.LANG || 'en_US.UTF-8',
-      ...options.env,
+      ...options.env, // User-provided env vars can override security defaults
     };
+
+    // Log when secure npm environment is applied for audit purposes
+    logger.info('Terminal session created with npm security hardening', {
+      sessionId: id,
+      cwd,
+      secureEnvKeys: Object.keys(secureEnv),
+    });
 
     console.log(`[Terminal] Creating session ${id} with shell: ${shell} in ${cwd}`);
 

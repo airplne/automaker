@@ -8,21 +8,29 @@
 
 import { BaseProvider } from './base-provider.js';
 import { ClaudeProvider } from './claude-provider.js';
-import type { InstallationStatus } from './types.js';
+import { OllamaProvider } from './ollama-provider.js';
+import type { InstallationStatus, ModelDefinition } from './types.js';
+import type { SettingsService } from '../services/settings-service.js';
 
 export class ProviderFactory {
   /**
    * Get the appropriate provider for a given model ID
    *
    * @param modelId Model identifier (e.g., "claude-opus-4-5-20251101", "gpt-5.2", "cursor-fast")
+   * @param settingsService Optional settings service for npm security and other features
    * @returns Provider instance for the model
    */
-  static getProviderForModel(modelId: string): BaseProvider {
+  static getProviderForModel(modelId: string, settingsService?: SettingsService): BaseProvider {
     const lowerModel = modelId.toLowerCase();
 
     // Claude models (claude-*, opus, sonnet, haiku)
     if (lowerModel.startsWith('claude-') || ['haiku', 'sonnet', 'opus'].includes(lowerModel)) {
-      return new ClaudeProvider();
+      return new ClaudeProvider(settingsService);
+    }
+
+    // Ollama models (ollama:* or ollama-*)
+    if (lowerModel.startsWith('ollama:') || lowerModel.startsWith('ollama-')) {
+      return new OllamaProvider();
     }
 
     // Future providers:
@@ -35,7 +43,7 @@ export class ProviderFactory {
 
     // Default to Claude for unknown models
     console.warn(`[ProviderFactory] Unknown model prefix for "${modelId}", defaulting to Claude`);
-    return new ClaudeProvider();
+    return new ClaudeProvider(settingsService);
   }
 
   /**
@@ -44,6 +52,7 @@ export class ProviderFactory {
   static getAllProviders(): BaseProvider[] {
     return [
       new ClaudeProvider(),
+      new OllamaProvider(),
       // Future providers...
     ];
   }
@@ -80,6 +89,9 @@ export class ProviderFactory {
       case 'anthropic':
         return new ClaudeProvider();
 
+      case 'ollama':
+        return new OllamaProvider();
+
       // Future providers:
       // case "cursor":
       //   return new CursorProvider();
@@ -96,7 +108,7 @@ export class ProviderFactory {
    */
   static getAllAvailableModels() {
     const providers = this.getAllProviders();
-    const allModels = [];
+    const allModels: ModelDefinition[] = [];
 
     for (const provider of providers) {
       const models = provider.getAvailableModels();

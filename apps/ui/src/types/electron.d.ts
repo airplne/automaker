@@ -19,12 +19,24 @@ export interface Message {
   images?: ImageAttachment[];
 }
 
+export interface QueuedPrompt {
+  id: string;
+  message: string;
+  imagePaths?: string[];
+  model?: string;
+  addedAt: string;
+}
+
 export interface ToolUse {
   name: string;
   input: unknown;
 }
 
 export type StreamEvent =
+  | {
+      type: 'started';
+      sessionId: string;
+    }
   | {
       type: 'message';
       sessionId: string;
@@ -54,6 +66,17 @@ export type StreamEvent =
       sessionId: string;
       error: string;
       message?: Message;
+    }
+  | {
+      type: 'queue_updated';
+      sessionId: string;
+      queue: QueuedPrompt[];
+    }
+  | {
+      type: 'queue_error';
+      sessionId: string;
+      error: string;
+      promptId?: string;
     };
 
 export interface SessionListItem {
@@ -279,6 +302,28 @@ export type AutoModeEvent =
       featureId: string;
       projectPath?: string;
       phaseNumber: number;
+    }
+  | {
+      type: 'npm_security_approval_required';
+      id: string;
+      featureId: string;
+      worktreeId?: string;
+      projectPath: string;
+      command: {
+        original: string;
+        type: string;
+        packageManager: string;
+        riskLevel: string;
+      };
+      timestamp: number;
+      options: Array<{
+        id: string;
+        label: string;
+        description: string;
+        action: string;
+        isDefault?: boolean;
+        isRecommended?: boolean;
+      }>;
     };
 
 export type SpecRegenerationEvent =
@@ -445,6 +490,8 @@ export interface AutoModeAPI {
 }
 
 export interface ElectronAPI {
+  /** Present in Electron builds via preload; used for UI indicators only */
+  isElectron?: boolean;
   ping: () => Promise<string>;
   openExternalLink: (url: string) => Promise<{ success: boolean; error?: string }>;
 
@@ -571,6 +618,63 @@ export interface ElectronAPI {
 
   // Spec Regeneration APIs
   specRegeneration: SpecRegenerationAPI;
+
+  // BMAD APIs
+  bmad: {
+    listPersonas: () => Promise<{
+      success: boolean;
+      bundleVersion?: string;
+      personas?: Array<{
+        id: string;
+        label: string;
+        description?: string;
+        icon?: string;
+        module?: string;
+        sourcePath?: string;
+      }>;
+      error?: string;
+    }>;
+    getStatus: (projectPath: string) => Promise<{
+      success: boolean;
+      status?: {
+        enabled: boolean;
+        artifactsDir: string;
+        installed: boolean;
+        installedVersion: string | null;
+        bundleVersion: string;
+        needsUpgrade: boolean;
+      };
+      error?: string;
+    }>;
+    initialize: (
+      projectPath: string,
+      options?: { artifactsDir?: string; scaffoldMethodology?: boolean }
+    ) => Promise<{
+      success: boolean;
+      status?: {
+        enabled: boolean;
+        artifactsDir: string;
+        installed: boolean;
+        installedVersion: string | null;
+        bundleVersion: string;
+        needsUpgrade: boolean;
+      };
+      createdFeatures?: unknown[];
+      error?: string;
+    }>;
+    upgrade: (projectPath: string) => Promise<{
+      success: boolean;
+      status?: {
+        enabled: boolean;
+        artifactsDir: string;
+        installed: boolean;
+        installedVersion: string | null;
+        bundleVersion: string;
+        needsUpgrade: boolean;
+      };
+      error?: string;
+    }>;
+  };
 }
 
 export interface WorktreeInfo {

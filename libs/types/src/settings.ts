@@ -7,9 +7,12 @@
  */
 
 import type { AgentModel } from './model.js';
+import type { NpmSecuritySettings } from './npm-security.js';
+import { DEFAULT_NPM_SECURITY_SETTINGS } from './npm-security.js';
 
-// Re-export AgentModel for convenience
-export type { AgentModel };
+// Re-export AgentModel and NpmSecuritySettings for convenience
+export type { AgentModel, NpmSecuritySettings };
+export { DEFAULT_NPM_SECURITY_SETTINGS };
 
 /**
  * ThemeMode - Available color themes for the UI
@@ -161,6 +164,12 @@ export interface AIProfile {
   isBuiltIn: boolean;
   /** Optional icon identifier or emoji */
   icon?: string;
+  /** @deprecated Use agentIds instead */
+  personaId?: string;
+  /** Selected BMAD agents for this profile */
+  agentIds?: string[];
+  /** Optional custom system prompt appended at execution time */
+  systemPrompt?: string;
 }
 
 /**
@@ -400,6 +409,20 @@ export interface ProjectSettings {
   // Claude Agent SDK Settings
   /** Auto-load CLAUDE.md files using SDK's settingSources option (project override) */
   autoLoadClaudeMd?: boolean;
+
+  // BMAD Integration (project-specific)
+  bmad?: {
+    /** Enable BMAD for this project */
+    enabled?: boolean;
+    /** Installed BMAD bundle version (if initialized into project root) */
+    installedVersion?: string;
+    /** Artifact output directory relative to project root (git-friendly) */
+    artifactsDir?: string;
+  };
+
+  // npm Security Settings (project-specific)
+  /** npm security policy settings for guardrails */
+  npmSecurity?: NpmSecuritySettings;
 }
 
 /**
@@ -474,6 +497,7 @@ export const DEFAULT_CREDENTIALS: Credentials = {
 /** Default project settings (empty - all settings are optional and fall back to global) */
 export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   version: 1,
+  npmSecurity: DEFAULT_NPM_SECURITY_SETTINGS,
 };
 
 /** Current version of the global settings schema */

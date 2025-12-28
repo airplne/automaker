@@ -104,50 +104,44 @@ describe('model-resolver', () => {
     });
 
     describe('with unknown model keys', () => {
-      it('should return default for unknown model key', () => {
+      it('should pass through unknown model key as raw model string', () => {
         const result = resolveModelString('unknown-model');
 
-        expect(result).toBe(DEFAULT_MODELS.claude);
+        expect(result).toBe('unknown-model');
       });
 
-      it('should warn about unknown model key', () => {
+      it('should log about using raw model string', () => {
         resolveModelString('unknown-model');
 
-        expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown model key'));
-        expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown-model'));
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Using raw model string')
+        );
+        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('unknown-model'));
       });
 
-      it('should use custom default for unknown model key', () => {
+      it('should not override unknown model key with custom default', () => {
         const customDefault = 'claude-opus-4-20241113';
         const result = resolveModelString('gpt-4', customDefault);
 
-        expect(result).toBe(customDefault);
-      });
-
-      it('should warn and show default being used', () => {
-        const customDefault = 'claude-custom-default';
-        resolveModelString('invalid-key', customDefault);
-
-        expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining(customDefault));
+        expect(result).toBe('gpt-4');
       });
     });
 
     describe('case sensitivity', () => {
-      it('should be case-sensitive for aliases', () => {
+      it('should resolve aliases case-insensitively', () => {
         const resultUpper = resolveModelString('SONNET');
         const resultLower = resolveModelString('sonnet');
 
-        // Uppercase should not resolve (falls back to default)
-        expect(resultUpper).toBe(DEFAULT_MODELS.claude);
-        // Lowercase should resolve
+        // Uppercase and lowercase should both resolve
+        expect(resultUpper).toBe(CLAUDE_MODEL_MAP.sonnet);
         expect(resultLower).toBe(CLAUDE_MODEL_MAP.sonnet);
       });
 
       it('should handle mixed case in claude- strings', () => {
         const result = resolveModelString('Claude-Sonnet-4-20250514');
 
-        // Capital 'C' means it won't match 'claude-', falls back to default
-        expect(result).toBe(DEFAULT_MODELS.claude);
+        // Mixed case is normalized to lowercase
+        expect(result).toBe('claude-sonnet-4-20250514');
       });
     });
 
@@ -155,14 +149,13 @@ describe('model-resolver', () => {
       it('should handle model key with whitespace', () => {
         const result = resolveModelString('  sonnet  ');
 
-        // Will not match due to whitespace, falls back to default
-        expect(result).toBe(DEFAULT_MODELS.claude);
+        expect(result).toBe(CLAUDE_MODEL_MAP.sonnet);
       });
 
       it('should handle special characters in model key', () => {
         const result = resolveModelString('model@123');
 
-        expect(result).toBe(DEFAULT_MODELS.claude);
+        expect(result).toBe('model@123');
       });
     });
   });
@@ -260,11 +253,11 @@ describe('model-resolver', () => {
         expect(result).toBe(CLAUDE_MODEL_MAP.opus);
       });
 
-      it('should handle fallback chain: unknown -> session -> default', () => {
+      it('should treat unknown models as raw strings (no silent fallback)', () => {
         const result = getEffectiveModel('invalid', 'also-invalid', 'claude-opus-4-20241113');
 
-        // Both invalid models fall back to default
-        expect(result).toBe('claude-opus-4-20241113');
+        // Explicit model wins and is treated as a raw model identifier
+        expect(result).toBe('invalid');
       });
 
       it('should handle session with alias, no explicit', () => {

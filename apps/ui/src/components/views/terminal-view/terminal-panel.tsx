@@ -209,7 +209,7 @@ export function TerminalPanel({
   // Listen for system theme changes
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => {
+    const handleChange = (e: globalThis.MediaQueryListEvent) => {
       setSystemIsDark(e.matches);
     };
 
@@ -268,11 +268,10 @@ export function TerminalPanel({
     // - CSI sequences: \x1b[...letter
     // - OSC sequences: \x1b]...ST
     // - Other escape sequences: \x1b followed by various characters
-    // eslint-disable-next-line no-control-regex
-    return text.replace(
-      /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012]|\x1b[>=<]|\x1b[78HM]|\x1b#[0-9]|\x1b./g,
-      ''
-    );
+    // eslint-disable-next-line no-control-regex -- ANSI escape sequences intentionally contain control characters
+    const ansiRegex =
+      /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012]|\x1b[>=<]|\x1b[78HM]|\x1b#[0-9]|\x1b./g;
+    return text.replace(ansiRegex, '');
   };
 
   // Copy selected text to clipboard
@@ -555,7 +554,7 @@ export function TerminalPanel({
       searchAddonRef.current = searchAddon;
 
       // Create web links addon for clickable URLs with custom handler for Electron
-      const webLinksAddon = new WebLinksAddon((_event: MouseEvent, uri: string) => {
+      const webLinksAddon = new WebLinksAddon((_event: globalThis.MouseEvent, uri: string) => {
         // Use Electron API to open external links in system browser
         const api = getElectronAPI();
         if (api?.openExternalLink) {
@@ -584,7 +583,7 @@ export function TerminalPanel({
               | {
                   range: { start: { x: number; y: number }; end: { x: number; y: number } };
                   text: string;
-                  activate: (event: MouseEvent, text: string) => void;
+                  activate: (event: globalThis.MouseEvent, text: string) => void;
                 }[]
               | undefined
           ) => void
@@ -599,7 +598,7 @@ export function TerminalPanel({
           const links: {
             range: { start: { x: number; y: number }; end: { x: number; y: number } };
             text: string;
-            activate: (event: MouseEvent, text: string) => void;
+            activate: (event: globalThis.MouseEvent, text: string) => void;
           }[] = [];
 
           // File path patterns:
@@ -640,7 +639,7 @@ export function TerminalPanel({
                 end: { x: endX, y: lineNumber },
               },
               text: fullMatch,
-              activate: async (event: MouseEvent, text: string) => {
+              activate: async (event: globalThis.MouseEvent, text: string) => {
                 // Parse the path and line/column from the matched text
                 const pathMatch = text.match(/^([^\s:()]+)(?:[:(\s](\d+)(?:[:,)](\d+))?)?/);
                 if (!pathMatch) return;

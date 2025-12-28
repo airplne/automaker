@@ -14,6 +14,7 @@ import type {
   DialogResult,
   SaveImageResult,
   AutoModeAPI,
+  BmadAPI,
   FeaturesAPI,
   SuggestionsAPI,
   SpecRegenerationAPI,
@@ -27,6 +28,7 @@ import type {
   IssueValidationInput,
   IssueValidationEvent,
 } from './electron';
+import type { BacklogPlanEvent, BacklogPlanResult } from '@automaker/types';
 import type { Message, SessionListItem } from '@/types/electron';
 import type { Feature, ClaudeUsageResponse } from '@/store/app-store';
 import type { WorktreeAPI, GitAPI, ModelDefinition, ProviderStatus } from '@/types/electron';
@@ -52,6 +54,7 @@ const getApiKey = (): string | null => {
 type EventType =
   | 'agent:stream'
   | 'auto-mode:event'
+  | 'backlog-plan:event'
   | 'suggestions:event'
   | 'spec-regeneration:event'
   | 'issue-validation:event';
@@ -734,6 +737,22 @@ export class HttpApiClient implements ElectronAPI {
     },
   };
 
+  // BMAD API
+  bmad: BmadAPI = {
+    listPersonas: () => this.get('/api/bmad/personas'),
+    getStatus: (projectPath: string) => this.post('/api/bmad/status', { projectPath }),
+    initialize: (
+      projectPath: string,
+      options?: { artifactsDir?: string; scaffoldMethodology?: boolean }
+    ) =>
+      this.post('/api/bmad/initialize', {
+        projectPath,
+        artifactsDir: options?.artifactsDir,
+        scaffoldMethodology: options?.scaffoldMethodology,
+      }),
+    upgrade: (projectPath: string) => this.post('/api/bmad/upgrade', { projectPath }),
+  };
+
   // Running Agents API
   runningAgents = {
     getAll: (): Promise<{
@@ -1104,24 +1123,11 @@ export class HttpApiClient implements ElectronAPI {
 
     apply: (
       projectPath: string,
-      plan: {
-        changes: Array<{
-          type: 'add' | 'update' | 'delete';
-          featureId?: string;
-          feature?: Record<string, unknown>;
-          reason: string;
-        }>;
-        summary: string;
-        dependencyUpdates: Array<{
-          featureId: string;
-          removedDependencies: string[];
-          addedDependencies: string[];
-        }>;
-      }
+      plan: BacklogPlanResult
     ): Promise<{ success: boolean; appliedChanges?: string[]; error?: string }> =>
       this.post('/api/backlog-plan/apply', { projectPath, plan }),
 
-    onEvent: (callback: (data: unknown) => void): (() => void) => {
+    onEvent: (callback: (event: BacklogPlanEvent) => void): (() => void) => {
       return this.subscribeToEvent('backlog-plan:event', callback as EventCallback);
     },
   };

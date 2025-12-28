@@ -11,6 +11,8 @@ import { useSetupStore } from '@/store/setup-store';
 import { getElectronAPI } from '@/lib/electron';
 import { Toaster } from 'sonner';
 import { ThemeOption, themeOptions } from '@/config/theme-options';
+import { NpmSecurityApprovalDialog } from '@/components/dialogs/npm-security-approval-dialog';
+import { useNpmSecurityEvents } from '@/hooks/use-npm-security-events';
 
 function RootLayoutContent() {
   const location = useLocation();
@@ -23,6 +25,9 @@ function RootLayoutContent() {
     () => useSetupStore.persist?.hasHydrated?.() ?? false
   );
   const { openFileBrowser } = useFileBrowser();
+
+  // Listen for npm security approval events
+  useNpmSecurityEvents();
 
   // Hidden streamer panel - opens with "\" key
   const handleStreamerPanelShortcut = useCallback((event: KeyboardEvent) => {
@@ -174,6 +179,10 @@ function RootLayoutContent() {
           streamerPanelOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       />
+
+      {/* Npm Security Approval Dialog */}
+      <NpmSecurityApprovalDialog />
+
       <Toaster richColors position="bottom-right" />
     </main>
   );

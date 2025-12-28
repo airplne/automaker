@@ -5,6 +5,13 @@ import { useAppStore } from '@/store/app-store';
 import { toast } from 'sonner';
 import { COLUMNS, ColumnId } from '../constants';
 
+const isColumnId = (value: unknown): value is ColumnId =>
+  value === 'backlog' ||
+  value === 'in_progress' ||
+  value === 'waiting_approval' ||
+  value === 'verified' ||
+  value === 'completed';
+
 interface UseBoardDragDropProps {
   features: Feature[];
   currentProject: { path: string; id: string } | null;
@@ -78,7 +85,7 @@ export function useBoardDragDrop({
         // Dropped on another feature - find its column
         const overFeature = features.find((f) => f.id === overId);
         if (overFeature) {
-          targetStatus = overFeature.status;
+          targetStatus = isColumnId(overFeature.status) ? overFeature.status : null;
         }
       }
 

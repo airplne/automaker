@@ -1,8 +1,7 @@
 import { useMemo, useCallback } from 'react';
 import { Feature, useAppStore } from '@/store/app-store';
 import { resolveDependencies, getBlockingDependencies } from '@automaker/dependency-resolver';
-
-type ColumnId = Feature['status'];
+import type { ColumnId } from '../constants';
 
 interface UseBoardColumnFeaturesProps {
   features: Feature[];
@@ -83,7 +82,14 @@ export function useBoardColumnFeatures({
         }
       } else {
         // Otherwise, use the feature's status (fallback to backlog for unknown statuses)
-        const status = f.status as ColumnId;
+        const status: ColumnId =
+          f.status === 'backlog' ||
+          f.status === 'in_progress' ||
+          f.status === 'waiting_approval' ||
+          f.status === 'verified' ||
+          f.status === 'completed'
+            ? f.status
+            : 'backlog';
 
         // Filter all items by worktree, including backlog
         // This ensures backlog items with a branch assigned only show in that branch
@@ -91,15 +97,10 @@ export function useBoardColumnFeatures({
           if (matchesWorktree) {
             map.backlog.push(f);
           }
-        } else if (map[status]) {
-          // Only show if matches current worktree or has no worktree assigned
+        } else {
+          // Only show if matches current worktree
           if (matchesWorktree) {
             map[status].push(f);
-          }
-        } else {
-          // Unknown status, default to backlog
-          if (matchesWorktree) {
-            map.backlog.push(f);
           }
         }
       }

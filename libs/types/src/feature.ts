@@ -27,6 +27,15 @@ export interface Feature {
   titleGenerating?: boolean;
   category: string;
   description: string;
+  /** Optional AI profile id selected at creation time */
+  aiProfileId?: string;
+  /**
+   * Optional persona selection (e.g., "bmad:pm", "bmad:analyst", "bmad:party-synthesis")
+   * @deprecated Use agentIds instead
+   */
+  personaId?: string;
+  /** Selected BMAD agents for collaboration (max 4) */
+  agentIds?: string[];
   passes?: boolean;
   priority?: number;
   status?: string;

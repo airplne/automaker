@@ -76,7 +76,10 @@ const priorityConfig = {
 };
 
 export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps) {
-  const config = statusConfig[data.status] || statusConfig.backlog;
+  const config =
+    typeof data.status === 'string' && data.status in statusConfig
+      ? statusConfig[data.status as keyof typeof statusConfig]
+      : statusConfig.backlog;
   const StatusIcon = config.icon;
   const priorityConf = data.priority ? priorityConfig[data.priority as 1 | 2 | 3] : null;
 

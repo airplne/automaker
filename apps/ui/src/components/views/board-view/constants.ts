@@ -1,6 +1,4 @@
-import { Feature } from '@/store/app-store';
-
-export type ColumnId = Feature['status'];
+export type ColumnId = 'backlog' | 'in_progress' | 'waiting_approval' | 'verified' | 'completed';
 
 export const COLUMNS: { id: ColumnId; title: string; colorClass: string }[] = [
   { id: 'backlog', title: 'Backlog', colorClass: 'bg-[var(--status-backlog)]' },

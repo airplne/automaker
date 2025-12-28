@@ -49,10 +49,12 @@ import { ClaudeUsageService } from './services/claude-usage-service.js';
 import { createGitHubRoutes } from './routes/github/index.js';
 import { createContextRoutes } from './routes/context/index.js';
 import { createBacklogPlanRoutes } from './routes/backlog-plan/index.js';
+import { createBmadRoutes } from './routes/bmad/index.js';
+import { createNpmSecurityRoutes } from './routes/npm-security/index.js';
 import { cleanupStaleValidations } from './routes/github/routes/validation-common.js';
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const PORT = parseInt(process.env.PORT || '3008', 10);
 const DATA_DIR = process.env.DATA_DIR || './data';
@@ -62,20 +64,9 @@ const ENABLE_REQUEST_LOGGING = process.env.ENABLE_REQUEST_LOGGING !== 'false'; /
 const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
 
 if (!hasAnthropicKey) {
-  console.warn(`
-╔═══════════════════════════════════════════════════════════════════════╗
-║  ⚠️  WARNING: No Claude authentication configured                      ║
-║                                                                       ║
-║  The Claude Agent SDK requires authentication to function.            ║
-║                                                                       ║
-║  Set your Anthropic API key:                                          ║
-║    export ANTHROPIC_API_KEY="sk-ant-..."                              ║
-║                                                                       ║
-║  Or use the setup wizard in Settings to configure authentication.     ║
-╚═══════════════════════════════════════════════════════════════════════╝
-`);
-} else {
-  console.log('[Server] ✓ ANTHROPIC_API_KEY detected (API key auth)');
+  console.warn(
+    '[Server] ⚠️  ANTHROPIC_API_KEY not set - Claude features disabled. Set via env or Settings.'
+  );
 }
 
 // Initialize security
@@ -162,6 +153,8 @@ app.use('/api/claude', createClaudeRoutes(claudeUsageService));
 app.use('/api/github', createGitHubRoutes(events, settingsService));
 app.use('/api/context', createContextRoutes(settingsService));
 app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
+app.use('/api/bmad', createBmadRoutes(settingsService));
+app.use('/api/npm-security', createNpmSecurityRoutes(settingsService));
 
 // Create HTTP server
 const server = createServer(app);

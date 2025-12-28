@@ -153,7 +153,7 @@ Please analyze the current backlog and the user's request, then provide a JSON p
 
     // Get the model to use
     const effectiveModel = model || 'sonnet';
-    const provider = ProviderFactory.getProviderForModel(effectiveModel);
+    const provider = ProviderFactory.getProviderForModel(effectiveModel, settingsService);
 
     // Get autoLoadClaudeMd setting
     const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(

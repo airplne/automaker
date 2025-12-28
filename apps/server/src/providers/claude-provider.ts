@@ -151,11 +151,7 @@ export class ClaudeProvider extends BaseProvider {
       maxTurns,
       cwd,
       allowedTools: toolsToUse,
-      permissionMode: 'acceptEdits',
-      sandbox: {
-        enabled: true,
-        autoAllowBashIfSandboxed: true,
-      },
+      permissionMode: 'default',
       abortController,
       // Resume existing SDK session if we have a session ID
       ...(sdkSessionId && conversationHistory && conversationHistory.length > 0
@@ -163,6 +159,8 @@ export class ClaudeProvider extends BaseProvider {
         : {}),
       // Forward settingSources for CLAUDE.md file loading
       ...(options.settingSources && { settingSources: options.settingSources }),
+      // Forward sandbox configuration
+      ...(options.sandbox && { sandbox: options.sandbox }),
     };
 
     // Build prompt payload
@@ -196,7 +194,8 @@ export class ClaudeProvider extends BaseProvider {
         yield msg as ProviderMessage;
       }
     } catch (error) {
-      console.error('[ClaudeProvider] executeQuery() error during execution:', error);
+      console.error('[ClaudeProvider] ERROR: executeQuery() error during execution:', error);
+      console.error('[ClaudeProvider] ERROR stack:', (error as Error).stack);
       throw error;
     }
   }

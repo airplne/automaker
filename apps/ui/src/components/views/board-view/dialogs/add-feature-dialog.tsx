@@ -64,6 +64,23 @@ import {
   type AncestorContext,
 } from '@automaker/dependency-resolver';
 
+type FeatureData = {
+  title: string;
+  category: string;
+  description: string;
+  images: FeatureImage[];
+  imagePaths: DescriptionImagePath[];
+  textFilePaths: DescriptionTextFilePath[];
+  skipTests: boolean;
+  model: AgentModel;
+  thinkingLevel: ThinkingLevel;
+  branchName: string; // Can be empty string to use current branch
+  priority: number;
+  planningMode: PlanningMode;
+  requirePlanApproval: boolean;
+  dependencies?: string[];
+};
+
 interface AddFeatureDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -104,6 +121,7 @@ export function AddFeatureDialog({
   open,
   onOpenChange,
   onAdd,
+  onAddAndStart,
   categorySuggestions,
   branchSuggestions,
   branchCardCounts,
@@ -210,16 +228,16 @@ export function AddFeatureDialog({
     allFeatures,
   ]);
 
-  const handleAdd = () => {
+  const buildFeatureData = (): FeatureData | null => {
     if (!newFeature.description.trim()) {
       setDescriptionError(true);
-      return;
+      return null;
     }
 
     // Validate branch selection when "other branch" is selected
     if (useWorktrees && !useCurrentBranch && !newFeature.branchName.trim()) {
       toast.error('Please select a branch name');
-      return;
+      return null;
     }
 
     const category = newFeature.category || 'Uncategorized';
@@ -257,7 +275,7 @@ export function AddFeatureDialog({
       }
     }
 
-    onAdd({
+    return {
       title: newFeature.title,
       category,
       description: finalDescription,
@@ -276,9 +294,10 @@ export function AddFeatureDialog({
       requirePlanApproval,
       // In spawn mode, automatically add parent as dependency
       dependencies: isSpawnMode && parentFeature ? [parentFeature.id] : undefined,
-    });
+    };
+  };
 
-    // Reset form
+  const resetForm = () => {
     setNewFeature({
       title: '',
       category: '',
@@ -307,6 +326,20 @@ export function AddFeatureDialog({
     setDescriptionError(false);
     onOpenChange(false);
   };
+
+  const handleAction = (actionFn?: (data: FeatureData) => void) => {
+    if (!actionFn) return;
+
+    const featureData = buildFeatureData();
+    if (!featureData) return;
+
+    actionFn(featureData);
+    resetForm();
+  };
+
+  const handleAdd = () => handleAction(onAdd);
+
+  const handleAddAndStart = () => handleAction(onAddAndStart);
 
   const handleDialogClose = (open: boolean) => {
     onOpenChange(open);
@@ -806,6 +839,17 @@ export function AddFeatureDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
+          {onAddAndStart && (
+            <Button
+              onClick={handleAddAndStart}
+              variant="secondary"
+              data-testid="confirm-add-and-start-feature"
+              disabled={useWorktrees && !useCurrentBranch && !newFeature.branchName.trim()}
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Make
+            </Button>
+          )}
           <HotkeyButton
             onClick={handleAdd}
             hotkey={{ key: 'Enter', cmdCtrl: true }}

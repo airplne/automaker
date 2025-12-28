@@ -22,7 +22,8 @@ export function useBoardColumnFeatures({
 }: UseBoardColumnFeaturesProps) {
   // Memoize column features to prevent unnecessary re-renders
   const columnFeaturesMap = useMemo(() => {
-    const map: Record<ColumnId, Feature[]> = {
+    // Use a more flexible type to support dynamic pipeline statuses
+    const map: Record<string, Feature[]> = {
       backlog: [],
       in_progress: [],
       waiting_approval: [],
@@ -75,9 +76,27 @@ export function useBoardColumnFeatures({
         matchesWorktree = featureBranch === effectiveBranch;
       }
 
+      // Use the feature's status (fallback to backlog for unknown statuses)
+      const status = f.status || 'backlog';
+
+      // IMPORTANT:
+      // Historically, we forced "running" features into in_progress so they never disappeared
+      // during stale reload windows. With pipelines, a feature can legitimately be running while
+      // its status is `pipeline_*`, so we must respect that status to render it in the right column.
       if (isRunning) {
-        // Only show running tasks if they match the current worktree
-        if (matchesWorktree) {
+        if (!matchesWorktree) return;
+
+        if (status.startsWith('pipeline_')) {
+          if (!map[status]) map[status] = [];
+          map[status].push(f);
+          return;
+        }
+
+        // If it's running and has a known non-backlog status, keep it in that status.
+        // Otherwise, fallback to in_progress as the "active work" column.
+        if (status !== 'backlog' && map[status]) {
+          map[status].push(f);
+        } else {
           map.in_progress.push(f);
         }
       } else {
@@ -148,7 +167,7 @@ export function useBoardColumnFeatures({
 
   const getColumnFeatures = useCallback(
     (columnId: ColumnId) => {
-      return columnFeaturesMap[columnId];
+      return columnFeaturesMap[columnId] || [];
     },
     [columnFeaturesMap]
   );

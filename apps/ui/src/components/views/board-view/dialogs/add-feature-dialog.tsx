@@ -28,6 +28,8 @@ import {
   ChevronDown,
   ChevronRight,
   Play,
+  Users,
+  UserCog,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
@@ -166,6 +168,7 @@ export function AddFeatureDialog({
   const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(null);
   const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['executive']));
+  const [usePartyMode, setUsePartyMode] = useState(true); // Party Mode is default
 
   const { personas: bmadPersonas, isLoading: isLoadingPersonas } = useBmadPersonas({
     enabled: open,
@@ -205,6 +208,19 @@ export function AddFeatureDialog({
       setUseCurrentBranch(true);
       setPlanningMode(defaultPlanningMode);
       setRequirePlanApproval(defaultRequirePlanApproval);
+      // Initialize Party Mode with all 7 agents selected by default
+      setUsePartyMode(true);
+      setSelectedAgentIds(
+        new Set([
+          'bmad:strategist-marketer',
+          'bmad:technologist-architect',
+          'bmad:fulfillization-manager',
+          'bmad:security-guardian',
+          'bmad:analyst-strategist',
+          'bmad:financial-strategist',
+          'bmad:operations-commander',
+        ])
+      );
 
       // Initialize ancestors for spawn mode
       if (parentFeature) {
@@ -405,17 +421,38 @@ export function AddFeatureDialog({
   // BMAD personas are now selected on the Prompt tab, not via profiles
   const modelOnlyProfiles = useMemo(() => aiProfiles.filter((p) => !p.personaId), [aiProfiles]);
 
+  // All executive agent IDs for Party Mode
+  const allExecutiveAgentIds = [
+    'bmad:strategist-marketer',
+    'bmad:technologist-architect',
+    'bmad:fulfillization-manager',
+    'bmad:security-guardian',
+    'bmad:analyst-strategist',
+    'bmad:financial-strategist',
+    'bmad:operations-commander',
+  ];
+
   // Multi-select agent toggle function
   const toggleAgentSelection = (agentId: string) => {
     setSelectedAgentIds((prev) => {
       const next = new Set(prev);
       if (next.has(agentId)) {
         next.delete(agentId);
-      } else if (next.size < 4) {
+      } else if (next.size < 7) {
         next.add(agentId);
       }
       return next;
     });
+  };
+
+  // Toggle Party Mode - selects all 7 agents or clears to individual selection
+  const togglePartyMode = (enabled: boolean) => {
+    setUsePartyMode(enabled);
+    if (enabled) {
+      setSelectedAgentIds(new Set(allExecutiveAgentIds));
+    } else {
+      setSelectedAgentIds(new Set());
+    }
   };
 
   const toggleCategory = (category: string) => {
@@ -432,17 +469,7 @@ export function AddFeatureDialog({
 
   // Agent categories - Executive Suite agents only
   const agentCategories = useMemo(() => {
-    const executiveAgentIds = [
-      'bmad:strategist-marketer',
-      'bmad:technologist-architect',
-      'bmad:fulfillization-manager',
-      'bmad:security-guardian',
-      'bmad:analyst-strategist',
-      'bmad:financial-strategist',
-      'bmad:operations-commander',
-    ];
-
-    const executiveAgents = executiveAgentIds
+    const executiveAgents = allExecutiveAgentIds
       .map((agentId) => bmadPersonas.find((p) => p.id === agentId))
       .filter((agent): agent is NonNullable<typeof agent> => agent !== undefined)
       .map((agent) => ({
@@ -647,12 +674,12 @@ export function AddFeatureDialog({
             {/* BMAD Agent Collaboration Selection */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Add Executive Agents to Task</Label>
+                <Label>Executive Agent Collaboration</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
-                    {selectedAgentIds.size}/4 selected
+                    {selectedAgentIds.size}/7 selected
                   </span>
-                  {selectedAgentIds.size > 0 && (
+                  {!usePartyMode && selectedAgentIds.size > 0 && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -670,68 +697,138 @@ export function AddFeatureDialog({
                   Loading agents...
                 </div>
               ) : (
-                <div
-                  className="space-y-3 border rounded-md p-3 max-h-[400px] overflow-y-auto"
-                  data-testid="feature-agent-select"
-                >
-                  {Object.entries(agentCategories).map(([categoryKey, category]) => {
-                    const isExpanded = expandedCategories.has(categoryKey);
-                    const selectedInCategory = category.agents.filter((agent) =>
-                      selectedAgentIds.has(agent.id)
-                    ).length;
-
-                    return (
-                      <div key={categoryKey} className="space-y-2">
-                        <div
-                          className="flex items-center justify-between cursor-pointer hover:bg-muted/50 p-1 rounded-md transition-colors"
-                          onClick={() => toggleCategory(categoryKey)}
-                        >
-                          <div className="flex items-center gap-2">
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                            )}
-                            <span className="text-sm font-medium">{category.label}</span>
-                            {selectedInCategory > 0 && (
-                              <span className="text-xs text-muted-foreground">
-                                ({selectedInCategory})
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {isExpanded && (
-                          <div className="space-y-1 ml-6">
-                            {category.agents.map((agent) => {
-                              const isSelected = selectedAgentIds.has(agent.id);
-                              const isDisabled = !isSelected && selectedAgentIds.size >= 4;
-                              const selectedArray = Array.from(selectedAgentIds);
-                              const orderNumber = isSelected
-                                ? selectedArray.indexOf(agent.id) + 1
-                                : 0;
-
-                              return (
-                                <AgentCheckboxItem
-                                  key={agent.id}
-                                  agent={agent}
-                                  isSelected={isSelected}
-                                  isDisabled={isDisabled}
-                                  onToggle={() => toggleAgentSelection(agent.id)}
-                                  orderNumber={orderNumber}
-                                />
-                              );
-                            })}
-                          </div>
-                        )}
+                <div className="space-y-3" data-testid="feature-agent-select">
+                  {/* Party Mode Toggle - Primary Option */}
+                  <div
+                    className={cn(
+                      'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                      usePartyMode
+                        ? 'bg-primary/10 border-primary'
+                        : 'hover:bg-muted/50 border-border'
+                    )}
+                    onClick={() => togglePartyMode(true)}
+                  >
+                    <div
+                      className={cn(
+                        'w-10 h-10 rounded-full flex items-center justify-center',
+                        usePartyMode ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                      )}
+                    >
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Party Mode</span>
+                        <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                          Recommended
+                        </span>
                       </div>
-                    );
-                  })}
+                      <p className="text-xs text-muted-foreground">
+                        All 7 executive agents collaborate: Sage, Theo, Finn, Cerberus, Mary, Walt,
+                        Axel
+                      </p>
+                    </div>
+                    <Checkbox
+                      checked={usePartyMode}
+                      onCheckedChange={() => togglePartyMode(true)}
+                    />
+                  </div>
+
+                  {/* Individual Selection Toggle */}
+                  <div
+                    className={cn(
+                      'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                      !usePartyMode
+                        ? 'bg-muted/30 border-border'
+                        : 'hover:bg-muted/50 border-border'
+                    )}
+                    onClick={() => togglePartyMode(false)}
+                  >
+                    <div
+                      className={cn(
+                        'w-10 h-10 rounded-full flex items-center justify-center',
+                        !usePartyMode ? 'bg-muted-foreground/20' : 'bg-muted'
+                      )}
+                    >
+                      <UserCog className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="font-medium">Select Individual Agents</span>
+                      <p className="text-xs text-muted-foreground">
+                        Choose specific agents (up to 7)
+                      </p>
+                    </div>
+                    <Checkbox
+                      checked={!usePartyMode}
+                      onCheckedChange={() => togglePartyMode(false)}
+                    />
+                  </div>
+
+                  {/* Individual Agent Selection (shown when not in Party Mode) */}
+                  {!usePartyMode && (
+                    <div className="border rounded-md p-3 max-h-[300px] overflow-y-auto space-y-3">
+                      {Object.entries(agentCategories).map(([categoryKey, category]) => {
+                        const isExpanded = expandedCategories.has(categoryKey);
+                        const selectedInCategory = category.agents.filter((agent) =>
+                          selectedAgentIds.has(agent.id)
+                        ).length;
+
+                        return (
+                          <div key={categoryKey} className="space-y-2">
+                            <div
+                              className="flex items-center justify-between cursor-pointer hover:bg-muted/50 p-1 rounded-md transition-colors"
+                              onClick={() => toggleCategory(categoryKey)}
+                            >
+                              <div className="flex items-center gap-2">
+                                {isExpanded ? (
+                                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                )}
+                                <span className="text-sm font-medium">{category.label}</span>
+                                {selectedInCategory > 0 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({selectedInCategory})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {isExpanded && (
+                              <div className="space-y-1 ml-6">
+                                {category.agents.map((agent) => {
+                                  const isSelected = selectedAgentIds.has(agent.id);
+                                  const isDisabled = !isSelected && selectedAgentIds.size >= 7;
+                                  const selectedArray = Array.from(selectedAgentIds);
+                                  const orderNumber = isSelected
+                                    ? selectedArray.indexOf(agent.id) + 1
+                                    : 0;
+
+                                  return (
+                                    <AgentCheckboxItem
+                                      key={agent.id}
+                                      agent={agent}
+                                      isSelected={isSelected}
+                                      isDisabled={isDisabled}
+                                      onToggle={() => toggleAgentSelection(agent.id)}
+                                      orderNumber={orderNumber}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
               <p className="text-xs text-muted-foreground">
-                Select up to 4 executive agents for collaborative execution.
+                {usePartyMode
+                  ? 'Party Mode: All 7 executive agents deliberate and synthesize a unified recommendation.'
+                  : 'Select up to 7 executive agents for collaborative execution.'}
               </p>
             </div>
 

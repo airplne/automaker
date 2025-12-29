@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   User,
   Sparkles,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -25,7 +26,7 @@ import {
 import type { AIProfile } from '@/store/app-store';
 import type { AgentModel } from '@automaker/types';
 
-type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
+type PlanningMode = 'skip' | 'lite' | 'spec' | 'full' | 'wizard';
 
 interface FeatureDefaultsSectionProps {
   showProfilesOnly: boolean;
@@ -102,12 +103,17 @@ export function FeatureDefaultsSection({
                   ? 'bg-blue-500/10'
                   : defaultPlanningMode === 'spec'
                     ? 'bg-purple-500/10'
-                    : 'bg-amber-500/10'
+                    : defaultPlanningMode === 'wizard'
+                      ? 'bg-indigo-500/10'
+                      : 'bg-amber-500/10'
             )}
           >
             {defaultPlanningMode === 'skip' && <Zap className="w-5 h-5 text-emerald-500" />}
             {defaultPlanningMode === 'lite' && <ClipboardList className="w-5 h-5 text-blue-500" />}
             {defaultPlanningMode === 'spec' && <FileText className="w-5 h-5 text-purple-500" />}
+            {defaultPlanningMode === 'wizard' && (
+              <MessageSquare className="w-5 h-5 text-indigo-500" />
+            )}
             {defaultPlanningMode === 'full' && <ScrollText className="w-5 h-5 text-amber-500" />}
           </div>
           <div className="flex-1 space-y-2">
@@ -140,6 +146,12 @@ export function FeatureDefaultsSection({
                       <span>Spec (Lite SDD)</span>
                     </div>
                   </SelectItem>
+                  <SelectItem value="wizard">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-3.5 w-3.5 text-indigo-500" />
+                      <span>Wizard</span>
+                    </div>
+                  </SelectItem>
                   <SelectItem value="full">
                     <div className="flex items-center gap-2">
                       <ScrollText className="h-3.5 w-3.5 text-amber-500" />
@@ -156,6 +168,8 @@ export function FeatureDefaultsSection({
                 'Create a quick planning outline with tasks before building.'}
               {defaultPlanningMode === 'spec' &&
                 'Generate a specification with acceptance criteria for approval.'}
+              {defaultPlanningMode === 'wizard' &&
+                'Interactive Q&A session to gather requirements before planning.'}
               {defaultPlanningMode === 'full' &&
                 'Create comprehensive spec with phased implementation plan.'}
             </p>

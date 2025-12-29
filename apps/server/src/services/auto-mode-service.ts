@@ -2968,6 +2968,9 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     // Load MCP permission settings (global setting only)
     const mcpPermissions = await getMCPPermissionSettings(this.settingsService, '[AutoMode]');
 
+    const effectiveMcpServers =
+      options?.mcpServers ?? (Object.keys(mcpServers).length > 0 ? mcpServers : undefined);
+
     // Build SDK options using centralized configuration for feature implementation
     const sdkOptions = createAutoModeOptions({
       cwd: workDir,
@@ -2975,12 +2978,11 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       systemPrompt: options?.systemPrompt,
       outputFormat: options?.outputFormat,
       maxThinkingTokens: options?.maxThinkingTokens,
-      mcpServers: options?.mcpServers,
+      mcpServers: effectiveMcpServers,
       hooks: options?.hooks,
       abortController,
       autoLoadClaudeMd,
       enableSandboxMode,
-      mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
       mcpAutoApproveTools: mcpPermissions.mcpAutoApproveTools,
       mcpUnrestrictedTools: mcpPermissions.mcpUnrestrictedTools,
     });
@@ -3047,7 +3049,6 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       systemPrompt: sdkOptions.systemPrompt,
       settingSources: sdkOptions.settingSources,
       sandbox: sdkOptions.sandbox, // Pass sandbox configuration
-      mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined, // Pass MCP servers configuration
       mcpAutoApproveTools: mcpPermissions.mcpAutoApproveTools, // Pass MCP auto-approve setting
       mcpUnrestrictedTools: mcpPermissions.mcpUnrestrictedTools, // Pass MCP unrestricted tools setting
     };

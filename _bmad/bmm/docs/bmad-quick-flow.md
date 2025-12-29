@@ -302,7 +302,7 @@ The `code-review` workflow provides senior developer review of implemented code.
 
 ```bash
 # From tech spec
-quick-dev sprint-artifacts/tech-spec-user-auth.md
+quick-dev _bmad-output/implementation-artifacts/tech-spec-user-auth.md
 
 # Direct development
 quick-dev "Add CORS middleware to API endpoints"

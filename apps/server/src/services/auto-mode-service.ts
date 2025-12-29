@@ -2860,11 +2860,11 @@ This helps parse your summary correctly in the output logs.`;
 
   private normalizeBmadArtifactsDir(input: string | undefined | null): string {
     const trimmed = (input ?? '').trim();
-    if (!trimmed) return '.automaker/bmad-output';
+    if (!trimmed) return '_bmad-output';
 
     // Enforce project-relative paths (no absolute paths or traversal).
     if (path.isAbsolute(trimmed) || trimmed.includes('..')) {
-      return '.automaker/bmad-output';
+      return '_bmad-output';
     }
 
     return trimmed.replaceAll('\\', '/').replace(/^\/+/, '');

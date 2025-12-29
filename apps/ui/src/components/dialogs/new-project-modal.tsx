@@ -84,7 +84,7 @@ export function NewProjectModal({
   const [customUrl, setCustomUrl] = useState('');
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [enableBmad, setEnableBmad] = useState(false);
-  const [bmadArtifactsDir, setBmadArtifactsDir] = useState('.automaker/bmad-output');
+  const [bmadArtifactsDir, setBmadArtifactsDir] = useState('_bmad-output');
   const [scaffoldBmadMethodology, setScaffoldBmadMethodology] = useState(false);
   const { openFileBrowser } = useFileBrowser();
 
@@ -117,7 +117,7 @@ export function NewProjectModal({
       setActiveTab('blank');
       setErrors({});
       setEnableBmad(false);
-      setBmadArtifactsDir('.automaker/bmad-output');
+      setBmadArtifactsDir('_bmad-output');
       setScaffoldBmadMethodology(false);
     }
   }, [open]);
@@ -339,14 +339,15 @@ export function NewProjectModal({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="_bmad-output">_bmad-output (default)</SelectItem>
                       <SelectItem value=".automaker/bmad-output">
-                        .automaker/bmad-output (default)
+                        .automaker/bmad-output (AutoMaker-managed)
                       </SelectItem>
-                      <SelectItem value="_bmad-output">_bmad-output (project root)</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Default keeps artifacts AutoMaker-managed; project root is easier to commit.
+                    Default follows BMAD conventions; <code>.automaker/</code> keeps artifacts
+                    AutoMaker-managed.
                   </p>
                 </div>
 

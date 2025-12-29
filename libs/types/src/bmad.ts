@@ -5,6 +5,8 @@
  * across the Automaker UI and server.
  */
 
+import type { ExecuteOptions } from './provider.js';
+
 /**
  * A persona identifier (e.g., "bmad:pm", "bmad:analyst", "bmad:party-synthesis")
  */
@@ -29,8 +31,8 @@ export interface ResolvedPersona {
   systemPrompt: string;
   model?: string;
   thinkingBudget?: number;
-  mcpServers?: Record<string, unknown>;
-  hooks?: string[];
+  mcpServers?: ExecuteOptions['mcpServers'];
+  hooks?: ExecuteOptions['hooks'];
 }
 
 /** Resolved multi-agent collaboration configuration */

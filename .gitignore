@@ -17,6 +17,9 @@ out/
 /.automaker/*
 /.automaker/
 
+# BMAD output (default artifacts folder)
+_bmad-output/
+
 .worktrees/
 
 /logs

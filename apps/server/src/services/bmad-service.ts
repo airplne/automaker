@@ -24,11 +24,11 @@ type BmadStatus = {
 
 function normalizeArtifactsDir(input: string | undefined | null): string {
   const trimmed = (input ?? '').trim();
-  if (!trimmed) return '.automaker/bmad-output';
+  if (!trimmed) return '_bmad-output';
 
   // Disallow absolute paths and traversal; keep it project-relative for safety + portability.
   if (path.isAbsolute(trimmed) || trimmed.includes('..')) {
-    return '.automaker/bmad-output';
+    return '_bmad-output';
   }
 
   return trimmed.replaceAll('\\', '/').replace(/^\/+/, '');
@@ -83,6 +83,7 @@ async function patchBmadOutputPaths(projectPath: string, artifactsDir: string): 
   const configFiles = [
     path.join(projectPath, '_bmad', 'core', 'config.yaml'),
     path.join(projectPath, '_bmad', 'bmm', 'config.yaml'),
+    path.join(projectPath, '_bmad', 'bmm-executive', 'config.yaml'),
     path.join(projectPath, '_bmad', 'bmb', 'config.yaml'),
     path.join(projectPath, '_bmad', 'cis', 'config.yaml'),
     path.join(projectPath, '_bmad', '_memory', 'config.yaml'),

@@ -165,7 +165,7 @@ curl -sS -X POST "$AUTOMAKER_BASE_URL/api/bmad/status" \
   "success": true,
   "status": {
     "enabled": false,
-    "artifactsDir": ".automaker/bmad-output",
+    "artifactsDir": "_bmad-output",
     "installed": false,
     "installedVersion": null,
     "bundleVersion": "<BMAD_BUNDLE_VERSION>",

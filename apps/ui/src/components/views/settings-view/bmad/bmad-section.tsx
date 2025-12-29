@@ -23,7 +23,7 @@ export function BmadSection({ projectPath }: BmadSectionProps) {
   const [status, setStatus] = useState<BmadStatus | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
-  const [artifactsDir, setArtifactsDir] = useState('.automaker/bmad-output');
+  const [artifactsDir, setArtifactsDir] = useState('_bmad-output');
   const [scaffoldMethodology, setScaffoldMethodology] = useState(false);
 
   const artifactsSelectValue = useMemo(() => {
@@ -44,7 +44,7 @@ export function BmadSection({ projectPath }: BmadSectionProps) {
       const result = await api.bmad?.getStatus(projectPath);
       if (result?.success && result.status) {
         setStatus(result.status);
-        setArtifactsDir(result.status.artifactsDir || '.automaker/bmad-output');
+        setArtifactsDir(result.status.artifactsDir || '_bmad-output');
       } else {
         setStatus(null);
       }
@@ -221,10 +221,10 @@ export function BmadSection({ projectPath }: BmadSectionProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="_bmad-output">_bmad-output (default)</SelectItem>
               <SelectItem value=".automaker/bmad-output">
-                .automaker/bmad-output (default)
+                .automaker/bmad-output (AutoMaker-managed)
               </SelectItem>
-              <SelectItem value="_bmad-output">_bmad-output (project root)</SelectItem>
               <SelectItem value="custom">Custom…</SelectItem>
             </SelectContent>
           </Select>
@@ -232,13 +232,13 @@ export function BmadSection({ projectPath }: BmadSectionProps) {
             <Input
               value={artifactsDir}
               onChange={(e) => setArtifactsDir(e.target.value)}
-              placeholder="e.g., .automaker/bmad-output"
+              placeholder="e.g., _bmad-output"
               data-testid="bmad-artifacts-dir-input"
             />
           )}
           <p className="text-xs text-muted-foreground">
-            Default keeps artifacts AutoMaker-managed; <code>_bmad-output/</code> is easier to
-            commit to git.
+            Default follows BMAD conventions; <code>.automaker/</code> keeps artifacts
+            AutoMaker-managed.
           </p>
         </div>
 

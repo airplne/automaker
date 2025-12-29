@@ -27,21 +27,19 @@ export { requestApproval } from './routes/approval.js';
 export function createNpmSecurityRoutes(settingsService: SettingsService): Router {
   const router = Router();
 
-  // Settings routes
-  router.get('/settings/:projectPath(*)', createGetSettingsHandler(settingsService));
-  router.put('/settings/:projectPath(*)', createUpdateSettingsHandler(settingsService));
-  router.post(
-    '/settings/:projectPath(*)/allow-scripts',
-    createAllowScriptsHandler(settingsService)
-  );
+  // Settings routes - use POST with projectPath in body to avoid URL encoding issues
+  // (paths with slashes like /home/user/project don't work well in URL params)
+  router.post('/settings/get', createGetSettingsHandler(settingsService));
+  router.post('/settings/update', createUpdateSettingsHandler(settingsService));
+  router.post('/settings/allow-scripts', createAllowScriptsHandler(settingsService));
 
   // Approval routes
   router.get('/approval/pending', createGetPendingHandler());
   router.post('/approval/:requestId', createSubmitDecisionHandler(settingsService));
   router.get('/approval/stream', createStreamHandler());
 
-  // Audit routes
-  router.get('/audit/:projectPath(*)', createGetAuditLogHandler(settingsService));
+  // Audit routes - use POST with projectPath in body
+  router.post('/audit/get', createGetAuditLogHandler(settingsService));
 
   return router;
 }

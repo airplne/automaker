@@ -1,7 +1,7 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-export const BMAD_BUNDLE_VERSION = '6.0.0-alpha.22';
+export const BMAD_BUNDLE_VERSION = '6.0.0-alpha.23';
 
 function getPackageRoot(): string {
   const thisFilePath = fileURLToPath(import.meta.url);

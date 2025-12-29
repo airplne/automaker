@@ -157,6 +157,7 @@ app.use('/api/context', createContextRoutes(settingsService));
 app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
 app.use('/api/bmad', createBmadRoutes(settingsService));
 app.use('/api/npm-security', createNpmSecurityRoutes(settingsService));
+app.use('/api/pipeline', createPipelineRoutes(pipelineService));
 
 // Create HTTP server
 const server = createServer(app);

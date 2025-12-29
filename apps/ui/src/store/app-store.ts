@@ -11,6 +11,8 @@ import type {
   ThinkingLevel,
   ModelProvider,
   ThemeMode,
+  PipelineConfig,
+  PipelineStep,
 } from '@automaker/types';
 
 // Re-export shared types for convenience
@@ -986,6 +988,50 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     icon: 'Scale',
     personaId: 'bmad:fulfillization-manager',
   },
+  {
+    id: 'profile-bmad-cerberus',
+    name: 'BMAD: Cerberus (Security-Guardian)',
+    description: 'Security Architect + Risk Guardian. Security posture and threat modeling.',
+    model: 'sonnet',
+    thinkingLevel: 'high',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Shield',
+    personaId: 'bmad:security-guardian',
+  },
+  {
+    id: 'profile-bmad-mary',
+    name: 'BMAD: Mary (Analyst-Strategist)',
+    description: 'Chief Analyst + Strategic Intelligence Expert. Research and requirements.',
+    model: 'sonnet',
+    thinkingLevel: 'high',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'FileSearch',
+    personaId: 'bmad:analyst-strategist',
+  },
+  {
+    id: 'profile-bmad-walt',
+    name: 'BMAD: Walt (Financial-Strategist)',
+    description: 'Financial Strategist + Resource Allocator. Budgets and ROI analysis.',
+    model: 'sonnet',
+    thinkingLevel: 'medium',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'DollarSign',
+    personaId: 'bmad:financial-strategist',
+  },
+  {
+    id: 'profile-bmad-axel',
+    name: 'BMAD: Axel (Operations-Commander)',
+    description: 'Operations Commander + Process Optimizer. Efficiency and delivery.',
+    model: 'sonnet',
+    thinkingLevel: 'medium',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Settings',
+    personaId: 'bmad:operations-commander',
+  },
 ];
 
 const initialState: AppState = {
@@ -1057,6 +1103,7 @@ const initialState: AppState = {
   claudeRefreshInterval: 60,
   claudeUsage: null,
   claudeUsageLastUpdated: null,
+  pipelineConfigByProject: {},
 };
 
 export const useAppStore = create<AppState & AppActions>()(
@@ -2742,18 +2789,20 @@ export const useAppStore = create<AppState & AppActions>()(
       setPipelineConfig: (projectPath, config) => {
         set({
           pipelineConfigByProject: {
-            ...get().pipelineConfigByProject,
+            ...(get().pipelineConfigByProject || {}),
             [projectPath]: config,
           },
         });
       },
 
       getPipelineConfig: (projectPath) => {
-        return get().pipelineConfigByProject[projectPath] || null;
+        const configs = get().pipelineConfigByProject;
+        return configs?.[projectPath] || null;
       },
 
       addPipelineStep: (projectPath, step) => {
-        const config = get().pipelineConfigByProject[projectPath] || { version: 1, steps: [] };
+        const configs = get().pipelineConfigByProject || {};
+        const config = configs[projectPath] || { version: 1 as const, steps: [] };
         const now = new Date().toISOString();
         const newStep: PipelineStep = {
           ...step,
@@ -2769,7 +2818,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
         set({
           pipelineConfigByProject: {
-            ...get().pipelineConfigByProject,
+            ...configs,
             [projectPath]: { ...config, steps: newSteps },
           },
         });
@@ -2778,7 +2827,8 @@ export const useAppStore = create<AppState & AppActions>()(
       },
 
       updatePipelineStep: (projectPath, stepId, updates) => {
-        const config = get().pipelineConfigByProject[projectPath];
+        const configs = get().pipelineConfigByProject || {};
+        const config = configs[projectPath];
         if (!config) return;
 
         const stepIndex = config.steps.findIndex((s) => s.id === stepId);
@@ -2793,14 +2843,15 @@ export const useAppStore = create<AppState & AppActions>()(
 
         set({
           pipelineConfigByProject: {
-            ...get().pipelineConfigByProject,
+            ...configs,
             [projectPath]: { ...config, steps: updatedSteps },
           },
         });
       },
 
       deletePipelineStep: (projectPath, stepId) => {
-        const config = get().pipelineConfigByProject[projectPath];
+        const configs = get().pipelineConfigByProject || {};
+        const config = configs[projectPath];
         if (!config) return;
 
         const newSteps = config.steps.filter((s) => s.id !== stepId);
@@ -2810,14 +2861,15 @@ export const useAppStore = create<AppState & AppActions>()(
 
         set({
           pipelineConfigByProject: {
-            ...get().pipelineConfigByProject,
+            ...configs,
             [projectPath]: { ...config, steps: newSteps },
           },
         });
       },
 
       reorderPipelineSteps: (projectPath, stepIds) => {
-        const config = get().pipelineConfigByProject[projectPath];
+        const configs = get().pipelineConfigByProject || {};
+        const config = configs[projectPath];
         if (!config) return;
 
         const stepMap = new Map(config.steps.map((s) => [s.id, s]));
@@ -2831,7 +2883,7 @@ export const useAppStore = create<AppState & AppActions>()(
 
         set({
           pipelineConfigByProject: {
-            ...get().pipelineConfigByProject,
+            ...configs,
             [projectPath]: { ...config, steps: reorderedSteps },
           },
         });
@@ -2854,6 +2906,15 @@ export const useAppStore = create<AppState & AppActions>()(
 
         // Start with default shallow merge
         const merged = { ...current, ...persisted } as AppState & AppActions;
+
+        // Ensure project-keyed maps are always defined (prevent undefined access errors)
+        // This handles cases where persisted state is missing these fields
+        merged.boardBackgroundByProject = merged.boardBackgroundByProject ?? {};
+        merged.terminalLayoutByProject = merged.terminalLayoutByProject ?? {};
+        merged.pipelineConfigByProject = merged.pipelineConfigByProject ?? {};
+        merged.currentWorktreeByProject = merged.currentWorktreeByProject ?? {};
+        merged.worktreesByProject = merged.worktreesByProject ?? {};
+        merged.lastSelectedSessionByProject = merged.lastSelectedSessionByProject ?? {};
 
         // Restore terminal settings into terminalState
         // terminalSettings is persisted separately from terminalState to avoid
@@ -2916,6 +2977,14 @@ export const useAppStore = create<AppState & AppActions>()(
             ...DEFAULT_AI_PROFILES.filter((p) => !existingIds.has(p.id)),
           ];
         }
+
+        // Ensure project-keyed maps are initialized (prevent undefined access errors)
+        state.boardBackgroundByProject = state.boardBackgroundByProject ?? {};
+        state.terminalLayoutByProject = state.terminalLayoutByProject ?? {};
+        state.pipelineConfigByProject = state.pipelineConfigByProject ?? {};
+        state.currentWorktreeByProject = state.currentWorktreeByProject ?? {};
+        state.worktreesByProject = state.worktreesByProject ?? {};
+        state.lastSelectedSessionByProject = state.lastSelectedSessionByProject ?? {};
 
         // Rehydrate terminal settings from persisted state
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

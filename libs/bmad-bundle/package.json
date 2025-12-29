@@ -1,6 +1,6 @@
 {
   "name": "@automaker/bmad-bundle",
-  "version": "6.0.0-alpha.22",
+  "version": "6.0.0-alpha.23",
   "type": "module",
   "description": "BMAD resources bundled with AutoMaker (agents, workflows, manifests)",
   "main": "dist/index.js",

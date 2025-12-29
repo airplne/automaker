@@ -1,7 +1,10 @@
 /**
- * GET /settings/:projectPath endpoint - Get npm security settings
- * PUT /settings/:projectPath endpoint - Update npm security settings
- * POST /settings/:projectPath/allow-scripts endpoint - Toggle allow install scripts
+ * POST /settings/get endpoint - Get npm security settings
+ * POST /settings/update endpoint - Update npm security settings
+ * POST /settings/allow-scripts endpoint - Toggle allow install scripts
+ *
+ * All endpoints use POST with projectPath in body to avoid URL encoding issues
+ * with paths containing slashes (e.g., /home/user/project).
  */
 
 import type { Request, Response } from 'express';
@@ -12,7 +15,16 @@ import { validateAndCorrectNpmSecuritySettings } from '../../../lib/npm-security
 export function createGetSettingsHandler(settingsService: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const projectPath = decodeURIComponent(req.params.projectPath);
+      const { projectPath } = req.body as { projectPath?: string };
+
+      if (!projectPath || typeof projectPath !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: 'projectPath is required in request body',
+        });
+        return;
+      }
+
       const settings = await settingsService.getNpmSecuritySettings(projectPath);
       res.json({ success: true, data: settings });
     } catch (error) {
@@ -28,13 +40,23 @@ export function createGetSettingsHandler(settingsService: SettingsService) {
 export function createUpdateSettingsHandler(settingsService: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const projectPath = decodeURIComponent(req.params.projectPath);
-      const updates = req.body;
+      const { projectPath, ...updates } = req.body as { projectPath?: string } & Record<
+        string,
+        unknown
+      >;
+
+      if (!projectPath || typeof projectPath !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: 'projectPath is required in request body',
+        });
+        return;
+      }
 
       // Validate updates
       if (
         updates.dependencyInstallPolicy &&
-        !['strict', 'prompt', 'allow'].includes(updates.dependencyInstallPolicy)
+        !['strict', 'prompt', 'allow'].includes(updates.dependencyInstallPolicy as string)
       ) {
         res.status(400).json({
           success: false,
@@ -70,8 +92,16 @@ export function createUpdateSettingsHandler(settingsService: SettingsService) {
 export function createAllowScriptsHandler(settingsService: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const projectPath = decodeURIComponent(req.params.projectPath);
-      const { allow } = req.body;
+      const { projectPath, allow } = req.body as { projectPath?: string; allow?: boolean };
+
+      if (!projectPath || typeof projectPath !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: 'projectPath is required in request body',
+        });
+        return;
+      }
+
       await settingsService.setAllowInstallScripts(projectPath, allow === true);
       res.json({ success: true });
     } catch (error) {

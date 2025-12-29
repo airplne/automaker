@@ -566,9 +566,9 @@ export function EditFeatureDialog({
                 </div>
               ) : (
                 <div className="space-y-1 max-h-[200px] overflow-y-auto border rounded-lg p-2 bg-muted/20">
-                  {/* BMM Triad Agents */}
+                  {/* BMM Executive Agents */}
                   <div className="text-xs font-medium text-muted-foreground px-2 py-1">
-                    BMM Triad Agents
+                    BMM Executive Agents
                   </div>
                   {bmadPersonas
                     .filter((p) =>
@@ -576,6 +576,10 @@ export function EditFeatureDialog({
                         'bmad:strategist-marketer',
                         'bmad:technologist-architect',
                         'bmad:fulfillization-manager',
+                        'bmad:security-guardian',
+                        'bmad:analyst-strategist',
+                        'bmad:financial-strategist',
+                        'bmad:operations-commander',
                       ].includes(p.id)
                     )
                     .map((agent) => {

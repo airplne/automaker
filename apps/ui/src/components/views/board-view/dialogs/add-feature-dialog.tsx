@@ -27,6 +27,7 @@ import {
   Sparkles,
   ChevronDown,
   ChevronRight,
+  Play,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
@@ -164,7 +165,7 @@ export function AddFeatureDialog({
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(null);
   const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set());
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['triad']));
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['executive']));
 
   const { personas: bmadPersonas, isLoading: isLoadingPersonas } = useBmadPersonas({
     enabled: open,
@@ -410,7 +411,7 @@ export function AddFeatureDialog({
       const next = new Set(prev);
       if (next.has(agentId)) {
         next.delete(agentId);
-      } else if (next.size < 3) {
+      } else if (next.size < 4) {
         next.add(agentId);
       }
       return next;
@@ -429,17 +430,19 @@ export function AddFeatureDialog({
     });
   };
 
-  // Agent categories - filtered to Triad agents only
+  // Agent categories - Executive Suite agents only
   const agentCategories = useMemo(() => {
-    // Define the Triad agents with proper bmad: prefix
-    const triadAgentIds = [
+    const executiveAgentIds = [
       'bmad:strategist-marketer',
       'bmad:technologist-architect',
       'bmad:fulfillization-manager',
+      'bmad:security-guardian',
+      'bmad:analyst-strategist',
+      'bmad:financial-strategist',
+      'bmad:operations-commander',
     ];
 
-    // Filter bmadPersonas to only include Triad agents
-    const triadAgents = triadAgentIds
+    const executiveAgents = executiveAgentIds
       .map((agentId) => bmadPersonas.find((p) => p.id === agentId))
       .filter((agent): agent is NonNullable<typeof agent> => agent !== undefined)
       .map((agent) => ({
@@ -448,13 +451,13 @@ export function AddFeatureDialog({
         icon: agent.icon ?? '🤖',
       }));
 
-    // Return a single category for the Triad
-    const filteredCategories: Record<string, { label: string; agents: typeof triadAgents }> = {};
+    const filteredCategories: Record<string, { label: string; agents: typeof executiveAgents }> =
+      {};
 
-    if (triadAgents.length > 0) {
-      filteredCategories.triad = {
-        label: 'Triad Agents',
-        agents: triadAgents,
+    if (executiveAgents.length > 0) {
+      filteredCategories.executive = {
+        label: 'Executive Agents',
+        agents: executiveAgents,
       };
     }
 
@@ -644,10 +647,10 @@ export function AddFeatureDialog({
             {/* BMAD Agent Collaboration Selection */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Add Triad Agents to Task</Label>
+                <Label>Add Executive Agents to Task</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
-                    {selectedAgentIds.size}/3 selected
+                    {selectedAgentIds.size}/4 selected
                   </span>
                   {selectedAgentIds.size > 0 && (
                     <Button
@@ -702,7 +705,7 @@ export function AddFeatureDialog({
                           <div className="space-y-1 ml-6">
                             {category.agents.map((agent) => {
                               const isSelected = selectedAgentIds.has(agent.id);
-                              const isDisabled = !isSelected && selectedAgentIds.size >= 3;
+                              const isDisabled = !isSelected && selectedAgentIds.size >= 4;
                               const selectedArray = Array.from(selectedAgentIds);
                               const orderNumber = isSelected
                                 ? selectedArray.indexOf(agent.id) + 1
@@ -728,8 +731,7 @@ export function AddFeatureDialog({
               )}
 
               <p className="text-xs text-muted-foreground">
-                Select up to 3 Triad agents for collaborative execution. Party mode automatically
-                uses all three Triad agents.
+                Select up to 4 executive agents for collaborative execution.
               </p>
             </div>
 

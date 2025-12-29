@@ -24,6 +24,56 @@
 
 ---
 
+## Execution Order (MUST FOLLOW)
+
+This PRP is meant to run on the **final synced PR branch**, not the pre-sync branch.
+
+1. Ensure npm-security firewall is **disabled by default** (development posture).
+2. Execute `docs/prp-sync-upstream-preserve-custom-work.md` and complete the upstream merge.
+3. Only then, execute this PRP to create `DOCUMENTATION.md`.
+
+**Verification (before writing `DOCUMENTATION.md`):**
+
+```bash
+# Must be clean and fully synced with upstream
+git status --porcelain=v1 -b
+git rev-list --left-right --count upstream/main...HEAD
+```
+
+**Expected:** clean working tree; behind count = `0`.
+
+---
+
+## Pre-Work: Capture Accurate Stats (USE IN DOCUMENTATION.md)
+
+Run these on the **final synced branch** and paste the results into `DOCUMENTATION.md`:
+
+```bash
+# Commits ahead/behind upstream
+git rev-list --left-right --count upstream/main...HEAD
+
+# Commit count ahead of upstream
+git rev-list --count upstream/main..HEAD
+
+# Diff summary for “what changed in this fork”
+git diff --shortstat upstream/main...HEAD
+git diff --stat upstream/main...HEAD
+
+# Optional: list custom commits (useful for reviewers)
+git log --oneline upstream/main..HEAD
+```
+
+For test/build results, run and record the final summary lines:
+
+```bash
+npm run build
+npm run test:packages
+npm run test:run --workspace=apps/server
+npm run test # optional UI E2E
+```
+
+---
+
 ## Deliverable Specification
 
 ### File: `DOCUMENTATION.md` (repo root)
@@ -62,7 +112,8 @@ This fork adds three major feature sets to AutoMaker:
 2. **Wizard Planning Mode** - Interactive Q&A workflow before task execution
 3. **Bug Fixes & Improvements** - Multiple stability and UX fixes
 
-**Total Changes:** 6 commits, 78+ files, ~5,000+ lines added
+**Custom Commits (ahead of upstream/main):** <fill from `git rev-list --count upstream/main..HEAD`>
+**Diff Summary (upstream/main...HEAD):** <paste `git diff --shortstat upstream/main...HEAD`>
 
 **Status:** Ready for review and consideration for upstream merge
 ```
@@ -125,8 +176,8 @@ Expansion of BMAD (Business Model Agile Development) agent system from 3 agents 
 
 ### Testing
 
-- ✅ 49/49 BMAD persona tests passing
-- ✅ 921/921 full server test suite passing (at time of implementation)
+- ✅ BMAD persona tests passing (run: `npm run test:run --workspace=apps/server`)
+- ✅ Server unit tests passing (run: `npm run test:run --workspace=apps/server`)
 - ✅ All 7 agents visible in UI
 - ✅ Bundle/source sync verified
 
@@ -134,7 +185,7 @@ Expansion of BMAD (Business Model Agile Development) agent system from 3 agents 
 
 - **Module rename:** `bmm-triad` → `bmm-executive`
 - **CLI commands:** `/bmad:bmm-triad:*` → `/bmad:bmm-executive:*`
-- **Removed:** All bmm-triad references (no backward compatibility shims)
+- **Removed:** `bmm-triad` module + command namespace (no alias/shim; saved persona IDs remain resolvable)
 
 ### Documentation References
 
@@ -219,7 +270,7 @@ Agent: Executes
 
 ### Testing
 
-- ✅ 14/14 wizard unit tests passing
+- ✅ Wizard unit tests passing (run: `npm run test:run --workspace=apps/server`)
 - ⚠️ E2E flow needs more testing in production use
 - ✅ Marker detection verified
 - ✅ State persistence verified
@@ -256,9 +307,9 @@ Agent: Executes
 - Changed request handling from `req.body` to `req.params` where appropriate
 
 **Enforcement Status:**
-- **DISABLED for development** - Firewall set to permissive defaults
+- **DISABLED by default (development posture)** - Firewall set to permissive defaults
 - Defaults: `dependencyInstallPolicy: 'allow'`, `allowInstallScripts: true`
-- Original enforcement logic commented out in `enforcePolicy()`
+- Policy engine returns early to allow all commands (still audits)
 
 **Rationale:** Disabled for development/testing. May need re-enabling for production.
 
@@ -301,14 +352,14 @@ Agent: Executes
 ```markdown
 ## Testing & Verification
 
-### Test Results (at time of commit)
+### Test Results (at time of documentation creation)
 
-| Test Suite         | Status                                                                 |
-| ------------------ | ---------------------------------------------------------------------- |
-| BMAD persona tests | ✅ 49/49 passing                                                       |
-| Wizard unit tests  | ✅ 14/14 passing                                                       |
-| Full server suite  | ⚠️ ~900+ passing (some npm-security tests fail with disabled firewall) |
-| Build              | ✅ All packages build cleanly                                          |
+| Test Suite         | Status                                       |
+| ------------------ | -------------------------------------------- |
+| BMAD persona tests | ✅ <fill from latest server test run output> |
+| Wizard unit tests  | ✅ <fill from latest server test run output> |
+| Full server suite  | ✅/⚠️ <fill from latest server test run>     |
+| Build              | ✅/⚠️ <fill from latest `npm run build`>     |
 
 ### Verification Documents
 
@@ -548,6 +599,7 @@ We believe these features add significant value to AutoMaker and would love to c
 ### Content Creation
 
 - [ ] Write Executive Summary
+- [ ] Insert accurate git/test/build stats (from commands above)
 - [ ] Document Executive Suite (7 agents, rationale, implementation)
 - [ ] Document Wizard Mode (flow, architecture, status)
 - [ ] Document npm-security changes
@@ -586,7 +638,7 @@ We believe these features add significant value to AutoMaker and would love to c
 - [ ] Breaking changes clearly stated
 - [ ] References to detailed PRPs provided
 - [ ] Review process suggested
-- [ ] File is 500-1000 lines (comprehensive but not overwhelming)
+- [ ] Length is appropriate (quality over line count)
 
 ---
 
@@ -608,7 +660,6 @@ rg "^## " DOCUMENTATION.md
 **Expected:**
 
 - File exists
-- ~500-1000 lines
 - 8-10 major sections
 
 ---

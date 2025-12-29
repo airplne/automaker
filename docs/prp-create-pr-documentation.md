@@ -14,7 +14,7 @@
 
 **Our fork has significant custom work:**
 
-1. BMAD Executive Suite (7 agents)
+1. BMAD Executive Suite (9 agents)
 2. Wizard Planning Mode (interactive Q&A)
 3. npm-security modifications
 4. Multiple bug fixes
@@ -108,7 +108,7 @@ npm run test # optional UI E2E
 
 This fork adds three major feature sets to AutoMaker:
 
-1. **BMAD Executive Suite** - Expanded AI agent system from 3 to 7 specialized personas
+1. **BMAD Executive Suite** - Expanded AI agent system from 3 to 9 specialized personas
 2. **Wizard Planning Mode** - Interactive Q&A workflow before task execution
 3. **Bug Fixes & Improvements** - Multiple stability and UX fixes
 
@@ -125,9 +125,9 @@ This fork adds three major feature sets to AutoMaker:
 
 ### What It Is
 
-Expansion of BMAD (Business Model Agile Development) agent system from 3 agents to 7 executive-level personas, creating a complete C-suite equivalent for AI-assisted development.
+Expansion of BMAD (Business Model Agile Development) agent system from 3 agents to 9 executive-level personas, creating a complete C-suite equivalent for AI-assisted development.
 
-### The 7 Executive Agents
+### The 9 Executive Agents
 
 | Agent        | Icon | Role                     | Persona                                                       |
 | ------------ | ---- | ------------------------ | ------------------------------------------------------------- |
@@ -138,6 +138,8 @@ Expansion of BMAD (Business Model Agile Development) agent system from 3 agents 
 | **Mary**     | 📊   | **Analyst-Strategist**   | **Chief Analyst - research, requirements, intelligence**      |
 | **Walt**     | 💰   | **Financial-Strategist** | **CFO-equivalent - budgets, ROI, unit economics**             |
 | **Axel**     | ⚙️   | **Operations-Commander** | **COO-equivalent - process optimization, delivery pipelines** |
+| **Apex**     | ⚡   | **Apex**                 | **Master developer - optimization, rapid iteration, CI/CD**   |
+| **Zen**      | 🧘   | **Zen**                  | **Master developer - clean code, maintainability, testing**   |
 
 ### Why We Built It
 
@@ -154,31 +156,31 @@ Expansion of BMAD (Business Model Agile Development) agent system from 3 agents 
 
 **Module Rename:** `bmm-triad` → `bmm-executive` (breaking change)
 
-**Rationale:** "Triad" means 3, but we now have 7 agents. "Executive Suite" accurately describes the C-suite parallel.
+**Rationale:** "Triad" means 3, but we now have 9 agents. "Executive Suite" accurately describes the C-suite parallel.
 
 ### Implementation Details
 
 **Modified Files:**
 
-- BMAD module: `_bmad/bmm-executive/` (7 agent definition files)
+- BMAD module: `_bmad/bmm-executive/` (9 agent definition files)
 - Bundle: `libs/bmad-bundle/bundle/_bmad/bmm-executive/`
-- Manifests: `_bmad/_config/agent-manifest.csv` (7 agent rows)
-- Server: `apps/server/src/services/bmad-persona-service.ts` (8 personas: 7 exec + party-synthesis)
-- UI: `apps/ui/src/store/app-store.ts` (7 executive profiles)
+- Manifests: `_bmad/_config/agent-manifest.csv` (9 agent rows)
+- Server: `apps/server/src/services/bmad-persona-service.ts` (10 personas: 9 exec + party-synthesis)
+- UI: `apps/ui/src/store/app-store.ts` (9 executive profiles)
 - Tests: `apps/server/tests/unit/services/bmad-persona-service.test.ts` (49 tests)
 
 **Bundle Version:** `6.0.0-alpha.22` → `6.0.0-alpha.23`
 
 **API Changes:**
 
-- `GET /api/bmad/personas` now returns 8 personas (was 4)
-- All 7 executive agents available for feature selection
+- `GET /api/bmad/personas` now returns 10 personas (was 4)
+- All 9 executive agents available for feature selection
 
 ### Testing
 
 - ✅ BMAD persona tests passing (run: `npm run test:run --workspace=apps/server`)
 - ✅ Server unit tests passing (run: `npm run test:run --workspace=apps/server`)
-- ✅ All 7 agents visible in UI
+- ✅ All 9 agents visible in UI
 - ✅ Bundle/source sync verified
 
 ### Breaking Changes
@@ -419,7 +421,7 @@ All verification work is documented in PRPs (Product Requirements Proposals):
 
 5. **Test Executive Suite**
    - Navigate to Settings → BMAD or AI Profiles
-   - Verify you see 7 executive agents (not 3)
+   - Verify you see 9 executive agents (not 3)
    - Create a feature and select Cerberus, Mary, Walt, or Axel
 
 6. **Test Wizard Mode**
@@ -573,7 +575,7 @@ No automatic migration provided. If users have saved features with `bmad:*` pers
 
 ### Questions for Maintainers
 
-1. **Executive Suite:** Is the 7-agent expansion valuable for AutoMaker users?
+1. **Executive Suite:** Is the 9-agent expansion valuable for AutoMaker users?
 2. **Wizard Mode:** Should interactive Q&A be part of AutoMaker core?
 3. **npm-security:** Should we re-enable the firewall before merge?
 4. **Breaking Changes:** Is bmm-triad → bmm-executive acceptable?
@@ -600,7 +602,7 @@ We believe these features add significant value to AutoMaker and would love to c
 
 - [ ] Write Executive Summary
 - [ ] Insert accurate git/test/build stats (from commands above)
-- [ ] Document Executive Suite (7 agents, rationale, implementation)
+- [ ] Document Executive Suite (9 agents, rationale, implementation)
 - [ ] Document Wizard Mode (flow, architecture, status)
 - [ ] Document npm-security changes
 - [ ] Document bug fixes

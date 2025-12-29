@@ -1047,6 +1047,30 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     icon: 'Settings',
     personaId: 'bmad:operations-commander',
   },
+  {
+    id: 'profile-bmad-apex',
+    name: 'BMAD: Apex (Peak Performance Developer)',
+    description:
+      'Peak Performance Full-Stack Engineer. Performance optimization, rapid iteration, CI/CD.',
+    model: 'sonnet',
+    thinkingLevel: 'medium',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Zap',
+    personaId: 'bmad:apex',
+  },
+  {
+    id: 'profile-bmad-zen',
+    name: 'BMAD: Zen (Clean Architecture Developer)',
+    description:
+      'Clean Architecture Full-Stack Engineer. Maintainable code, refactoring, test strategy.',
+    model: 'sonnet',
+    thinkingLevel: 'high',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Sparkles',
+    personaId: 'bmad:zen',
+  },
 ];
 
 const initialState: AppState = {

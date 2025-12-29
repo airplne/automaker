@@ -21,6 +21,8 @@ const PUBLIC_PERSONA_IDS = [
   'bmad:analyst-strategist',
   'bmad:financial-strategist',
   'bmad:operations-commander',
+  'bmad:apex',
+  'bmad:zen',
 ] as const;
 
 type AgentManifestRow = {
@@ -150,7 +152,7 @@ export class BmadPersonaService {
       return {
         systemPrompt: [
           `You are running "Party Mode Synthesis" inside AutoMaker.`,
-          `Simulate a short internal deliberation between the 7 executive personas:`,
+          `Simulate a short internal deliberation between the 9 executive personas:`,
           `- Sage (strategist-marketer): Business WHY/WHO, product strategy, requirements`,
           `- Theo (technologist-architect): Technical HOW, architecture, implementation`,
           `- Finn (fulfillization-manager): SHIP + UX/docs/ops + end-user experience`,
@@ -158,6 +160,8 @@ export class BmadPersonaService {
           `- Mary (analyst-strategist): Research, analysis, requirements elicitation`,
           `- Walt (financial-strategist): Financial planning, ROI, resource allocation`,
           `- Axel (operations-commander): Operations, process optimization, delivery`,
+          `- Apex (apex): Peak performance engineering, optimization, rapid implementation`,
+          `- Zen (zen): Clean architecture, maintainability, refactoring, test strategy`,
           `Then output a single synthesized recommendation.`,
           `You MUST be concise, specific, and actionable.`,
           params.artifactsDir
@@ -368,6 +372,8 @@ When responding:
       'bmad:analyst-strategist': { model: 'sonnet', thinkingBudget: 10000 },
       'bmad:financial-strategist': { model: 'sonnet', thinkingBudget: 10000 },
       'bmad:operations-commander': { model: 'sonnet', thinkingBudget: 9000 },
+      'bmad:apex': { model: 'sonnet', thinkingBudget: 9000 },
+      'bmad:zen': { model: 'sonnet', thinkingBudget: 10000 },
     };
 
     return defaults[personaId] || { model: 'sonnet', thinkingBudget: 8000 };

@@ -15,7 +15,7 @@
 - Fork: `https://github.com/airplne/automaker`
 - Upstream: `https://github.com/AutoMaker-Org/automaker`
 - Custom work implemented:
-  1. BMAD Executive Suite (7 agents)
+  1. BMAD Executive Suite (9 agents)
   2. Wizard Planning Mode
   3. npm-security guardrails (currently **disabled by default** in code)
   4. Multiple bug fixes
@@ -131,7 +131,7 @@ git rev-parse HEAD
 ```
 _bmad/bmm-executive/ (entire directory)
 libs/bmad-bundle/bundle/_bmad/bmm-executive/ (entire directory)
-_bmad/_config/agent-manifest.csv (our version with 7 agents)
+_bmad/_config/agent-manifest.csv (our version with 9 agents)
 _bmad/_config/manifest.yaml (our version with bmm-executive)
 _bmad/_config/files-manifest.csv (our version with bmm-executive hashes)
 libs/bmad-bundle/bundle/_bmad/_config/* (our bundled versions)
@@ -142,11 +142,11 @@ libs/bmad-bundle/src/index.ts (version constant)
 **Code integration points:**
 
 ```
-apps/server/src/services/bmad-persona-service.ts (PUBLIC_PERSONA_IDS with 7 agents)
+apps/server/src/services/bmad-persona-service.ts (PUBLIC_PERSONA_IDS with 9 agents)
 apps/server/src/services/bmad-service.ts (scaffolding with triad IDs)
 apps/server/tests/unit/services/bmad-persona-service.test.ts (8 persona tests)
-apps/ui/src/store/app-store.ts (DEFAULT_AI_PROFILES with 7 agents)
-apps/ui/src/components/views/board-view/dialogs/add-feature-dialog.tsx (7 agents in picker)
+apps/ui/src/store/app-store.ts (DEFAULT_AI_PROFILES with 9 executive agents)
+apps/ui/src/components/views/board-view/dialogs/add-feature-dialog.tsx (9 agents in picker)
 apps/ui/src/components/views/board-view/dialogs/edit-feature-dialog.tsx (executive grouping)
 apps/ui/src/components/views/profiles-view/components/profile-form.tsx (executive grouping)
 ```
@@ -216,7 +216,7 @@ git merge upstream/main --no-ff --no-commit
 | File                       | Conflict Type | Resolution Strategy                                    |
 | -------------------------- | ------------- | ------------------------------------------------------ |
 | `auto-mode-service.ts`     | HIGH          | Keep OURS (has wizard mode)                            |
-| `bmad-persona-service.ts`  | HIGH          | Keep OURS (has 7 agents)                               |
+| `bmad-persona-service.ts`  | HIGH          | Keep OURS (has 9 agents)                               |
 | `app-store.ts`             | MEDIUM        | Keep OURS (has executive profiles)                     |
 | `package.json` / lockfiles | HIGH          | Merge carefully (upstream may delete `pnpm-lock.yaml`) |
 | BMAD files                 | NONE          | Ours only (upstream doesn't have)                      |
@@ -303,7 +303,7 @@ git diff --name-only --diff-filter=U
 **Critical files - KEEP OURS:**
 
 ```bash
-# BMAD persona service (has 7 agents)
+# BMAD persona service (has 9 agents)
 git checkout --ours apps/server/src/services/bmad-persona-service.ts
 git add apps/server/src/services/bmad-persona-service.ts
 
@@ -315,7 +315,7 @@ git add apps/server/src/services/auto-mode-service.ts
 git checkout --ours apps/ui/src/store/app-store.ts
 git add apps/ui/src/store/app-store.ts
 
-# Add-feature dialog (has 7 agents + Play icon fix)
+# Add-feature dialog (has 9 agents + Play icon fix)
 git checkout --ours apps/ui/src/components/views/board-view/dialogs/add-feature-dialog.tsx
 git add apps/ui/src/components/views/board-view/dialogs/add-feature-dialog.tsx
 ```
@@ -365,7 +365,7 @@ Merge upstream AutoMaker-Org/automaker into fork
 Integrated latest official AutoMaker changes while preserving custom work:
 
 Custom Features Preserved:
-- BMAD Executive Suite (7 agents: Theo, Sage, Finn, Cerberus, Mary, Walt, Axel)
+- BMAD Executive Suite (9 agents: Theo, Sage, Finn, Cerberus, Mary, Walt, Axel, Apex, Zen)
 - Wizard Planning Mode (interactive Q&A workflow)
 - npm-security guardrails (firewall disabled by default for development)
 - UI bug fixes (state hydration, Play icon)
@@ -442,12 +442,12 @@ npm run dev:server
 curl -s http://localhost:3008/api/bmad/personas | jq '.personas[].id'
 ```
 
-**Expected:** 8 personas (7 executive + party-synthesis)
+**Expected:** 10 personas (9 executive + party-synthesis)
 
 **Checklist:**
 
-- [ ] API returns 8 personas
-- [ ] All 7 executive agents present
+- [ ] API returns 10 personas
+- [ ] All 9 executive agents present
 
 **Check Wizard Mode still works:**
 
@@ -481,7 +481,7 @@ git reset --hard "$PRE_MERGE_SHA"
 ### Integration Success
 
 - [ ] Upstream changes integrated
-- [ ] BMAD Executive Suite still functional (7 agents visible)
+- [ ] BMAD Executive Suite still functional (9 agents visible)
 - [ ] Wizard mode still functional (selector + modal work)
 - [ ] npm-security guardrails still present (firewall remains disabled by default)
 - [ ] Bug fixes preserved

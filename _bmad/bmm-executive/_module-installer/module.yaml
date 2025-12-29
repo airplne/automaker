@@ -1,9 +1,9 @@
 # BMM-Executive Module Installer Configuration
-# Complete 7-agent executive suite for enterprise projects
+# Complete 9-agent executive suite for enterprise projects
 
 name: bmm-executive
 display_name: 'BMM Executive Suite'
-description: 'Complete 7-agent executive architecture with Strategist Marketer (Sage), Technologist Architect (Theo), Fulfillization Manager (Finn), Security Guardian (Cerberus), Analyst Strategist (Mary), Financial Strategist (Walt), and Operations Commander (Axel)'
+description: 'Complete 9-agent executive architecture with Strategist Marketer (Sage), Technologist Architect (Theo), Fulfillization Manager (Finn), Security Guardian (Cerberus), Analyst Strategist (Mary), Financial Strategist (Walt), Operations Commander (Axel), Apex (Peak Performance), and Zen (Clean Architecture)'
 version: '1.0.0'
 author: 'BMad'
 
@@ -105,6 +105,15 @@ install:
       description: 'Axel - Operations Commander + Process Optimizer'
       agent: 'agents/operations-commander.md'
 
+    # Master Developer Agents
+    - name: 'bmad:bmm-executive:agents:apex'
+      description: 'Apex - Peak Performance Full-Stack Engineer'
+      agent: 'agents/apex.md'
+
+    - name: 'bmad:bmm-executive:agents:zen'
+      description: 'Zen - Clean Architecture Full-Stack Engineer'
+      agent: 'agents/zen.md'
+
   # Register workflow commands
   workflow_commands:
     - name: 'bmad:bmm-executive:workflows:triad-discovery'
@@ -127,7 +136,7 @@ install:
 post_install_message: |
   🏛️ BMM-Executive Suite installed successfully!
 
-  Your 7-agent executive team is ready:
+  Your 9-agent executive team is ready:
 
   **Original Triad:**
     📊 Sage (Strategist Marketer) - Business WHY & WHO (CMO/CPO)
@@ -139,6 +148,10 @@ post_install_message: |
     📊 Mary (Analyst Strategist) - Research & Analysis (Chief Analyst)
     💰 Walt (Financial Strategist) - Financial Strategy (CFO)
     ⚙️ Axel (Operations Commander) - Operations & Process (COO)
+
+  **Master Developer Additions:**
+    ⚡ Apex (Peak Performance) - Full-Stack Performance & Delivery Acceleration
+    🧘 Zen (Clean Architecture) - Full-Stack Maintainability & Quality Craftsmanship
 
   Quick Start:
     /bmad:bmm-executive:agents:strategist-marketer  - Start with strategy

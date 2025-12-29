@@ -208,7 +208,7 @@ export function AddFeatureDialog({
       setUseCurrentBranch(true);
       setPlanningMode(defaultPlanningMode);
       setRequirePlanApproval(defaultRequirePlanApproval);
-      // Initialize Party Mode with all 7 agents selected by default
+      // Initialize Party Mode with all executive agents selected by default
       setUsePartyMode(true);
       setSelectedAgentIds(
         new Set([
@@ -219,6 +219,8 @@ export function AddFeatureDialog({
           'bmad:analyst-strategist',
           'bmad:financial-strategist',
           'bmad:operations-commander',
+          'bmad:apex',
+          'bmad:zen',
         ])
       );
 
@@ -430,7 +432,11 @@ export function AddFeatureDialog({
     'bmad:analyst-strategist',
     'bmad:financial-strategist',
     'bmad:operations-commander',
+    'bmad:apex',
+    'bmad:zen',
   ];
+
+  const maxExecutiveAgents = allExecutiveAgentIds.length;
 
   // Multi-select agent toggle function
   const toggleAgentSelection = (agentId: string) => {
@@ -438,14 +444,14 @@ export function AddFeatureDialog({
       const next = new Set(prev);
       if (next.has(agentId)) {
         next.delete(agentId);
-      } else if (next.size < 7) {
+      } else if (next.size < maxExecutiveAgents) {
         next.add(agentId);
       }
       return next;
     });
   };
 
-  // Toggle Party Mode - selects all 7 agents or clears to individual selection
+  // Toggle Party Mode - selects all executive agents or clears to individual selection
   const togglePartyMode = (enabled: boolean) => {
     setUsePartyMode(enabled);
     if (enabled) {
@@ -677,7 +683,7 @@ export function AddFeatureDialog({
                 <Label>Executive Agent Collaboration</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
-                    {selectedAgentIds.size}/7 selected
+                    {selectedAgentIds.size}/{maxExecutiveAgents} selected
                   </span>
                   {!usePartyMode && selectedAgentIds.size > 0 && (
                     <Button
@@ -724,8 +730,8 @@ export function AddFeatureDialog({
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        All 7 executive agents collaborate: Sage, Theo, Finn, Cerberus, Mary, Walt,
-                        Axel
+                        All 9 executive agents collaborate: Sage, Theo, Finn, Cerberus, Mary, Walt,
+                        Axel, Apex, Zen
                       </p>
                     </div>
                     <Checkbox
@@ -755,7 +761,7 @@ export function AddFeatureDialog({
                     <div className="flex-1">
                       <span className="font-medium">Select Individual Agents</span>
                       <p className="text-xs text-muted-foreground">
-                        Choose specific agents (up to 7)
+                        Choose specific agents (up to {maxExecutiveAgents})
                       </p>
                     </div>
                     <Checkbox
@@ -798,7 +804,8 @@ export function AddFeatureDialog({
                               <div className="space-y-1 ml-6">
                                 {category.agents.map((agent) => {
                                   const isSelected = selectedAgentIds.has(agent.id);
-                                  const isDisabled = !isSelected && selectedAgentIds.size >= 7;
+                                  const isDisabled =
+                                    !isSelected && selectedAgentIds.size >= maxExecutiveAgents;
                                   const selectedArray = Array.from(selectedAgentIds);
                                   const orderNumber = isSelected
                                     ? selectedArray.indexOf(agent.id) + 1
@@ -827,8 +834,8 @@ export function AddFeatureDialog({
 
               <p className="text-xs text-muted-foreground">
                 {usePartyMode
-                  ? 'Party Mode: All 7 executive agents deliberate and synthesize a unified recommendation.'
-                  : 'Select up to 7 executive agents for collaborative execution.'}
+                  ? `Party Mode: All ${maxExecutiveAgents} executive agents deliberate and synthesize a unified recommendation.`
+                  : `Select up to ${maxExecutiveAgents} executive agents for collaborative execution.`}
               </p>
             </div>
 

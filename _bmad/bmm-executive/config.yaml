@@ -17,7 +17,7 @@ document_output_language: English
 output_folder: '{project-root}/_bmad-output'
 
 # Executive Suite Configuration
-# These are the seven agents that compose the Executive Suite (expanded from Triad)
+# These are the nine agents that compose the Executive Suite (expanded from Triad)
 executive_agents:
   # Original Triad (3)
   strategist_marketer: 'Sage' # Business WHY & WHO - CMO/CPO equivalent
@@ -28,6 +28,9 @@ executive_agents:
   analyst_strategist: 'Mary' # Research & Analysis - Chief Analyst
   financial_strategist: 'Walt' # Financial Strategy - CFO equivalent
   operations_commander: 'Axel' # Operations & Process - COO equivalent
+  # Master Developer Additions (2)
+  apex: 'Apex' # Peak Performance Full-Stack Engineer
+  zen: 'Zen' # Clean Architecture Full-Stack Engineer
 
 # Default party mode participants for Executive Suite
 party_mode_agents:
@@ -38,3 +41,5 @@ party_mode_agents:
   - 'analyst-strategist'
   - 'financial-strategist'
   - 'operations-commander'
+  - 'apex'
+  - 'zen'

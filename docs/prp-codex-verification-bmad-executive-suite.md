@@ -1,4 +1,4 @@
-# PRP: Codex Team Verification - BMAD 7-Agent Executive Suite Implementation
+# PRP: Codex Team Verification - BMAD 9-Agent Executive Suite Implementation
 
 **Status:** PARTIALLY VERIFIED (Automated + API; manual UI pending)
 **Created:** 2025-12-29
@@ -12,7 +12,7 @@
 
 ## Executive Summary
 
-The Claude team reports completion of the BMAD 7-Agent Executive Suite UI implementation. This PRP documents the verification checklist for the Codex team to independently validate all claims, test functionality, and sign off on the implementation.
+The Claude team reports completion of the BMAD 9-Agent Executive Suite UI implementation. This PRP documents the verification checklist for the Codex team to independently validate all claims, test functionality, and sign off on the implementation.
 
 ---
 
@@ -22,7 +22,7 @@ The Claude team reports completion of the BMAD 7-Agent Executive Suite UI implem
 
 This PRP touches two related but distinct mechanisms:
 
-- **Party Mode (Executive Suite Collaboration):** UI toggle that sets `feature.agentIds` to the 7 executive agent IDs. The backend uses `BmadPersonaService.resolveAgentCollab()` to build a single combined system prompt (collaborationMode: `sequential`). This is **not** 7 separate model runs.
+- **Party Mode (Executive Suite Collaboration):** UI toggle that sets `feature.agentIds` to the 9 executive agent IDs. The backend uses `BmadPersonaService.resolveAgentCollab()` to build a single combined system prompt (collaborationMode: `sequential`). This is **not** 9 separate model runs.
 - **Party Synthesis (one-shot persona):** Selecting persona `bmad:party-synthesis` triggers `AutoModeService.runPartySynthesis()` when `effectiveAgentIds` resolves to exactly `['bmad:party-synthesis']` (so `feature.agentIds` must be empty). This is **one** model run that _simulates_ an internal deliberation between **3–6** agents and returns structured JSON.
 
 ### Deterministic Commands Used Here
@@ -66,12 +66,12 @@ The Claude team claims the following changes to `apps/ui/src/components/views/bo
 
 | Claim        | Before               | After                               | Status            |
 | ------------ | -------------------- | ----------------------------------- | ----------------- |
-| Agent limit  | 4                    | 7                                   | VERIFIED (source) |
-| Default mode | Individual selection | Party Mode (all 7 agents)           | VERIFIED (source) |
+| Agent limit  | 4                    | 9                                   | VERIFIED (source) |
+| Default mode | Individual selection | Party Mode (all 9 agents)           | VERIFIED (source) |
 | UI structure | Checkbox list only   | Two toggle cards + collapsible list | VERIFIED (source) |
 | Icons added  | None                 | Users (Party), UserCog (Individual) | VERIFIED (source) |
 
-### Part 2: The 7 Executive Agents
+### Part 2: The 9 Executive Agents
 
 | Agent ID                      | Display Name | Icon | C-Suite Role  | Status   |
 | ----------------------------- | ------------ | ---- | ------------- | -------- |
@@ -82,6 +82,8 @@ The Claude team claims the following changes to `apps/ui/src/components/views/bo
 | `bmad:analyst-strategist`     | Mary         | 📊   | Chief Analyst | VERIFIED |
 | `bmad:financial-strategist`   | Walt         | 💰   | CFO           | VERIFIED |
 | `bmad:operations-commander`   | Axel         | ⚙️   | COO           | VERIFIED |
+| `bmad:apex`                   | Apex         | ⚡   | Master Dev    | VERIFIED |
+| `bmad:zen`                    | Zen          | 🧘   | Master Dev    | VERIFIED |
 
 ### Part 3: Party Synthesis (`bmad:party-synthesis`)
 
@@ -96,7 +98,7 @@ The Claude team claims the following changes to `apps/ui/src/components/views/bo
 
 | Claim                   | Description                                         | Status   |
 | ----------------------- | --------------------------------------------------- | -------- |
-| Party Mode = 7 agents   | All 7 executive agents collaborate                  | VERIFIED |
+| Party Mode = 9 agents   | All 9 executive agents collaborate                  | VERIFIED |
 | Planning mode unchanged | Skip/Lite/Spec/Full/Wizard still work independently | VERIFIED |
 | Party Mode is additive  | Enhances planning with multi-agent perspective      | VERIFIED |
 
@@ -120,9 +122,9 @@ rg -n "usePartyMode|allExecutiveAgentIds|togglePartyMode|selectedAgentIds" apps/
 
 - [x] **V1.1.1** - `Users` and `UserCog` icons imported from lucide-react
 - [x] **V1.1.2** - `usePartyMode` state initialized to `true` (Party Mode default)
-- [x] **V1.1.3** - All 7 agent IDs set in `setSelectedAgentIds` on dialog open
-- [x] **V1.1.4** - `allExecutiveAgentIds` array contains exactly 7 agent IDs
-- [x] **V1.1.5** - Agent selection limit is 7 (`next.size < 7`)
+- [x] **V1.1.3** - All 9 agent IDs set in `setSelectedAgentIds` on dialog open
+- [x] **V1.1.4** - `allExecutiveAgentIds` array contains exactly 9 agent IDs
+- [x] **V1.1.5** - Agent selection limit is 9
 - [x] **V1.1.6** - Party Mode toggle card with Users icon and "Recommended" badge
 - [x] **V1.1.7** - Individual Selection toggle card with UserCog icon
 - [x] **V1.1.8** - Collapsible agent list when not in Party Mode
@@ -177,7 +179,7 @@ _bmad/_config/agent-manifest.csv
 
 **Verify:**
 
-- [x] **V1.5.1** - All 7 executive agents present in manifest (module `bmm-executive`)
+- [x] **V1.5.1** - All 9 executive agents present in manifest (module `bmm-executive`)
 - [x] **V1.5.2** - All agents have correct path: `_bmad/bmm-executive/agents/*.md`
 - [x] **V1.5.3** - All agents have module: `bmm-executive`
 
@@ -190,10 +192,10 @@ _bmad/_config/agent-manifest.csv
 **Manual Test Cases:**
 
 - [ ] **V2.1.1** - Click "Add Feature" button (Party Mode default)
-- [ ] **V2.1.2** - Toggle to "Select Individual Agents" (collapsible list + 0/7)
-- [ ] **V2.1.3** - Select all 7 agents in Individual mode (cannot exceed 7)
-- [ ] **V2.1.4** - Toggle back to Party Mode (auto-select all 7)
-- [ ] **V2.1.5** - Submit feature with Party Mode (feature.json stores 7 agentIds)
+- [ ] **V2.1.2** - Toggle to "Select Individual Agents" (collapsible list + 0/9)
+- [ ] **V2.1.3** - Select all 9 agents in Individual mode (cannot exceed 9)
+- [ ] **V2.1.4** - Toggle back to Party Mode (auto-select all 9)
+- [ ] **V2.1.5** - Submit feature with Party Mode (feature.json stores 9 agentIds)
 
 #### V2.2: API Functional Tests
 
@@ -201,12 +203,12 @@ _bmad/_config/agent-manifest.csv
 # Start server (in another terminal)
 npm run start --workspace=apps/server
 
-# Expected: 8 (7 executive + party-synthesis)
+# Expected: 10 (9 executive + party-synthesis)
 curl -s http://localhost:3008/api/bmad/personas | node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(d.personas.length)"
 ```
 
-- [x] **V2.2.1** - `/api/bmad/personas` returns 8 personas
-- [x] **V2.2.2** - All 7 executive agents present in response
+- [x] **V2.2.1** - `/api/bmad/personas` returns 10 personas
+- [x] **V2.2.2** - All 9 executive agents present in response
 - [x] **V2.2.3** - Each agent has correct label/icon/module fields (from `_bmad/_config/agent-manifest.csv`)
 
 #### V2.3: Agent Resolution Tests
@@ -216,7 +218,7 @@ npm run test:run --workspace=apps/server -- tests/unit/services/bmad-persona-ser
 ```
 
 - [x] **V2.3.1** - All persona tests pass
-- [x] **V2.3.2** - Test covers all 7 executive agents
+- [x] **V2.3.2** - Test covers all 9 executive agents
 - [x] **V2.3.3** - Multi-agent collaboration resolution works
 
 ---
@@ -236,6 +238,8 @@ ls -la _bmad/bmm-executive/agents/
 - [x] **V3.1.5** - `analyst-strategist.md` exists
 - [x] **V3.1.6** - `financial-strategist.md` exists
 - [x] **V3.1.7** - `operations-commander.md` exists
+- [x] **V3.1.8** - `apex.md` exists
+- [x] **V3.1.9** - `zen.md` exists
 
 #### V3.2: Bundle Sync
 
@@ -244,7 +248,7 @@ diff -rq _bmad/bmm-executive/agents/ libs/bmad-bundle/bundle/_bmad/bmm-executive
 ```
 
 - [x] **V3.2.1** - No differences between source and bundle
-- [x] **V3.2.2** - Bundle agent-manifest.csv contains all 7 agents
+- [x] **V3.2.2** - Bundle agent-manifest.csv contains all 9 agents
 
 #### V3.3: Hot Reload Verification (Manual)
 
@@ -274,14 +278,14 @@ npm run test --workspace=apps/ui
 ## Evidence Collection (Codex)
 
 - `apps/ui/src/components/views/board-view/dialogs/add-feature-dialog.tsx` inspected + `rg` checks (PASS)
-- `_bmad/_config/agent-manifest.csv` contains all 7 executive agents (PASS)
+- `_bmad/_config/agent-manifest.csv` contains all 9 executive agents (PASS)
 - `_bmad/bmm-executive/agents/` files exist (PASS)
 - `diff -rq _bmad/bmm-executive/agents/ libs/bmad-bundle/bundle/_bmad/bmm-executive/agents/` shows no diffs (PASS)
 - `npm run build` (PASS; Vite chunk-size warnings only)
 - `npm run test:packages` (PASS)
 - `npm run test:run --workspace=apps/server` (PASS: 927/927)
 - `npm run build --workspace=apps/server` (PASS after type fix in `libs/types/src/bmad.ts`)
-- `npm run start --workspace=apps/server` + `curl http://localhost:3008/api/bmad/personas` (PASS: 8 personas; ids/icons/modules match manifest)
+- `npm run start --workspace=apps/server` + `curl http://localhost:3008/api/bmad/personas` (PASS: 10 personas; ids/icons/modules match manifest)
 
 ---
 
@@ -289,7 +293,7 @@ npm run test --workspace=apps/ui
 
 | #   | Issue/Question                                              | Status   | Resolution                                                                                                                                                                                |
 | --- | ----------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Does Party Mode “run all 7 agents” or is it symbolic?       | RESOLVED | Party Mode sets 7 `agentIds` and the backend builds one combined prompt (`resolveAgentCollab`, collaborationMode: `sequential`). No 7-call orchestration.                                 |
+| 1   | Does Party Mode “run all 9 agents” or is it symbolic?       | RESOLVED | Party Mode sets 9 `agentIds` and the backend builds one combined prompt (`resolveAgentCollab`, collaborationMode: `sequential`). No 9-call orchestration.                                 |
 | 2   | Is there a separate UI for viewing party synthesis results? | RESOLVED | No dedicated UI required. Party synthesis writes JSON to `<bmadArtifactsDir>/party-synthesis/<featureId>.json` and appends Markdown to `.automaker/features/<featureId>/agent-output.md`. |
 | 3   | How does the `runPartySynthesis` method get invoked?        | RESOLVED | Triggered only when `effectiveAgentIds === ['bmad:party-synthesis']` (and therefore `agentIds` must be empty, since `agentIds` take precedence over `personaId`).                         |
 | 4   | Are the "Core Questions" (WHY, HOW, RISK, etc.) enforced?   | RESOLVED | Not programmatically enforced; they exist as workflow guidance in `_bmad/bmm-executive/workflows/triad-discovery/workflow.md`.                                                            |

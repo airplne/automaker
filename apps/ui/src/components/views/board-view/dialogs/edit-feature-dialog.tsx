@@ -570,18 +570,19 @@ export function EditFeatureDialog({
                   <div className="text-xs font-medium text-muted-foreground px-2 py-1">
                     BMM Executive Agents
                   </div>
-                  {bmadPersonas
-                    .filter((p) =>
-                      [
-                        'bmad:strategist-marketer',
-                        'bmad:technologist-architect',
-                        'bmad:fulfillization-manager',
-                        'bmad:security-guardian',
-                        'bmad:analyst-strategist',
-                        'bmad:financial-strategist',
-                        'bmad:operations-commander',
-                      ].includes(p.id)
-                    )
+                  {[
+                    'bmad:strategist-marketer',
+                    'bmad:technologist-architect',
+                    'bmad:fulfillization-manager',
+                    'bmad:security-guardian',
+                    'bmad:analyst-strategist',
+                    'bmad:financial-strategist',
+                    'bmad:operations-commander',
+                    'bmad:apex',
+                    'bmad:zen',
+                  ]
+                    .map((id) => bmadPersonas.find((persona) => persona.id === id))
+                    .filter((agent): agent is NonNullable<typeof agent> => agent !== undefined)
                     .map((agent) => {
                       const isSelected = selectedAgentIds.has(agent.id);
                       const isDisabled = !isSelected && selectedAgentIds.size >= 4;

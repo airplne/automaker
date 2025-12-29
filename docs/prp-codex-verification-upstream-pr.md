@@ -90,7 +90,7 @@ grep -c "prp-" /home/aip0rt/Desktop/automaker/DOCUMENTATION.md
 
 **Checklist:**
 
-- [ ] 7 executive agents documented in table
+- [ ] 9 executive agents documented in table
 - [ ] Wizard marker protocol explained (`[WIZARD_QUESTION]`, `[WIZARD_COMPLETE]`)
 - [ ] Multiple PRP file references (>8)
 
@@ -160,36 +160,36 @@ git status --porcelain=v1
 ### 3.1 BMAD Executive Suite - File Structure
 
 ```bash
-# Verify 7 agent files exist
+# Verify 9 agent files exist
 ls -la /home/aip0rt/Desktop/automaker/_bmad/bmm-executive/agents/ 2>/dev/null | grep -c "\.md$"
 
 # Alternative: check bundle location
 ls -la /home/aip0rt/Desktop/automaker/libs/bmad-bundle/bundle/_bmad/bmm-executive/agents/ 2>/dev/null | grep -c "\.md$"
 ```
 
-**Expected:** 7 agent definition files
+**Expected:** 9 agent definition files
 
 **Checklist:**
 
-- [ ] 7 agent markdown files in `_bmad/bmm-executive/agents/` or bundle
-- [ ] Files include: strategist-marketer, technologist-architect, fulfillization-manager, security-guardian, analyst-strategist, financial-strategist, operations-commander
+- [ ] 9 agent markdown files in `_bmad/bmm-executive/agents/` or bundle
+- [ ] Files include: strategist-marketer, technologist-architect, fulfillization-manager, security-guardian, analyst-strategist, financial-strategist, operations-commander, apex, zen
 
 ### 3.2 BMAD Executive Suite - Server Integration
 
 ```bash
-grep -c "bmad:" /home/aip0rt/Desktop/automaker/apps/server/src/services/bmad-persona-service.ts
-grep "PERSONA_REGISTRY" /home/aip0rt/Desktop/automaker/apps/server/src/services/bmad-persona-service.ts | head -5
+rg -n "PUBLIC_PERSONA_IDS" /home/aip0rt/Desktop/automaker/apps/server/src/services/bmad-persona-service.ts
+rg -n "bmad:party-synthesis|bmad:strategist-marketer|bmad:technologist-architect|bmad:fulfillization-manager|bmad:security-guardian|bmad:analyst-strategist|bmad:financial-strategist|bmad:operations-commander|bmad:apex|bmad:zen" /home/aip0rt/Desktop/automaker/apps/server/src/services/bmad-persona-service.ts
 ```
 
 **Expected:**
 
-- 8 persona IDs registered (7 exec + party-synthesis)
-- Registry includes all executive persona IDs
+- 10 persona IDs registered (9 exec + party-synthesis)
+- `PUBLIC_PERSONA_IDS` includes all executive persona IDs
 
 **Checklist:**
 
-- [ ] PERSONA_REGISTRY contains 8 personas
-- [ ] All 7 executive personas present
+- [ ] PUBLIC_PERSONA_IDS contains 10 personas
+- [ ] All 9 executive personas present
 - [ ] party-synthesis persona present
 
 ### 3.3 BMAD Executive Suite - UI Integration
@@ -199,12 +199,12 @@ grep -c "DEFAULT_AI_PROFILES" /home/aip0rt/Desktop/automaker/apps/ui/src/store/a
 grep "bmad:.*-" /home/aip0rt/Desktop/automaker/apps/ui/src/store/app-store.ts | head -10
 ```
 
-**Expected:** 7 executive AI profiles in store
+**Expected:** 9 executive AI profiles in store
 
 **Checklist:**
 
 - [ ] DEFAULT_AI_PROFILES array defined
-- [ ] Contains 7 executive agent entries
+- [ ] Contains 9 executive agent entries
 - [ ] Profile IDs match server persona IDs
 
 ### 3.4 Wizard Planning Mode - Types
@@ -564,12 +564,12 @@ curl -s http://localhost:3008/api/bmad/personas | jq '.personas | length'
 curl -s http://localhost:3008/api/bmad/personas | jq '.personas[].id'
 ```
 
-**Expected:** 8 personas returned, all IDs correct
+**Expected:** 10 personas returned, all IDs correct
 
 **Checklist:**
 
-- [ ] API returns 8 personas
-- [ ] All 7 executive + party-synthesis present
+- [ ] API returns 10 personas
+- [ ] All 9 executive + party-synthesis present
 - [ ] No 404 or 500 errors
 
 ---
@@ -586,7 +586,7 @@ curl -s http://localhost:3008/api/bmad/personas | jq '.personas[].id'
 
 ### Feature Completeness
 
-- [ ] BMAD Executive Suite: 7 agents in server + UI
+- [ ] BMAD Executive Suite: 9 agents in server + UI
 - [ ] Wizard Mode: Types, backend, frontend implemented
 - [ ] npm-security: Disabled by default as documented
 - [ ] Bug fixes: All 3 fixes verified
@@ -675,7 +675,7 @@ If APPROVED, the next step is:
 ```bash
 git push origin main
 gh pr create --repo AutoMaker-Org/automaker \
-  --title "feat: BMAD Executive Suite (7 agents) + Wizard Planning Mode + Bug Fixes" \
+  --title "feat: BMAD Executive Suite (9 agents) + Wizard Planning Mode + Bug Fixes" \
   --body-file DOCUMENTATION.md
 ```
 

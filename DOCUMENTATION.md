@@ -11,12 +11,12 @@
 
 This fork adds three major feature sets to AutoMaker:
 
-1. **BMAD Executive Suite** - Expanded AI agent system from 3 to 7 specialized personas
+1. **BMAD Executive Suite** - Expanded AI agent system from 3 to 9 specialized personas
 2. **Wizard Planning Mode** - Interactive Q&A workflow before task execution
 3. **Bug Fixes & Improvements** - Multiple stability and UX fixes
 
-**Commits ahead of upstream/main:** 15
-**Diff Summary:** 1197 files changed, 243844 insertions(+), 438 deletions(-)
+**Commits ahead of upstream/main:** 23
+**Diff Summary:** 1205 files changed, 246118 insertions(+), 471 deletions(-)
 
 **Status:** Ready for review and consideration for upstream merge
 
@@ -40,9 +40,9 @@ This fork adds three major feature sets to AutoMaker:
 
 ### What It Is
 
-Expansion of BMAD (Business Model Agile Development) agent system from 3 agents to 7 executive-level personas, creating a complete C-suite equivalent for AI-assisted development.
+Expansion of BMAD (Business Model Agile Development) agent system from 3 agents to 9 executive-level personas, creating a complete C-suite equivalent for AI-assisted development.
 
-### The 7 Executive Agents
+### The 9 Executive Agents
 
 | Agent        | Icon | Role                   | Persona                                                            |
 | ------------ | ---- | ---------------------- | ------------------------------------------------------------------ |
@@ -53,6 +53,8 @@ Expansion of BMAD (Business Model Agile Development) agent system from 3 agents 
 | **Mary**     | 📊   | Analyst-Strategist     | Chief Analyst - research, requirements, intelligence               |
 | **Walt**     | 💰   | Financial-Strategist   | CFO-equivalent - budgets, ROI, unit economics                      |
 | **Axel**     | ⚙️   | Operations-Commander   | COO-equivalent - process optimization, delivery pipelines          |
+| **Apex**     | ⚡   | Peak Performance Dev   | Master developer - optimization, rapid iteration, CI/CD            |
+| **Zen**      | 🧘   | Clean Architecture Dev | Master developer - clean code, maintainability, test strategy      |
 
 ### Why We Built It
 
@@ -69,7 +71,7 @@ Expansion of BMAD (Business Model Agile Development) agent system from 3 agents 
 
 **Module Rename:** `bmm-triad` → `bmm-executive` (breaking change)
 
-**Rationale:** "Triad" means 3, but we now have 7 agents. "Executive Suite" accurately describes the C-suite parallel.
+**Rationale:** "Triad" means 3, but we now have 9 agents. "Executive Suite" accurately describes the C-suite parallel.
 
 ### Implementation Details
 
@@ -82,20 +84,22 @@ Expansion of BMAD (Business Model Agile Development) agent system from 3 agents 
 - `_bmad/bmm-executive/agents/analyst-strategist.md` (Mary)
 - `_bmad/bmm-executive/agents/financial-strategist.md` (Walt)
 - `_bmad/bmm-executive/agents/operations-commander.md` (Axel)
+- `_bmad/bmm-executive/agents/apex.md` (Apex)
+- `_bmad/bmm-executive/agents/zen.md` (Zen)
 
 **Server Integration:**
 
-- `apps/server/src/services/bmad-persona-service.ts` - 8 public personas (7 exec + party-synthesis)
+- `apps/server/src/services/bmad-persona-service.ts` - 10 public personas (9 exec + party-synthesis)
 - Persona IDs: `bmad:strategist-marketer`, `bmad:technologist-architect`, etc.
 
 **UI Integration:**
 
-- `apps/ui/src/store/app-store.ts` - 7 executive AI profiles in `DEFAULT_AI_PROFILES`
+- `apps/ui/src/store/app-store.ts` - 9 executive AI profiles in `DEFAULT_AI_PROFILES`
 - Profile icons mapped to Lucide React icons
 
 **Manifests:**
 
-- `_bmad/_config/agent-manifest.csv` - 7 agent rows with metadata
+- `_bmad/_config/agent-manifest.csv` - 9 agent rows with metadata
 
 **Bundle:**
 
@@ -113,12 +117,14 @@ Expansion of BMAD (Business Model Agile Development) agent system from 3 agents 
 | Mary       | Sonnet | 10,000          |
 | Walt       | Sonnet | 10,000          |
 | Axel       | Sonnet | 9,000           |
+| Apex       | Sonnet | 9,000           |
+| Zen        | Sonnet | 10,000          |
 | Party Mode | Opus   | 16,000          |
 
 ### API Changes
 
-- `GET /api/bmad/personas` now returns 8 personas (was 4)
-- All 7 executive agents available for feature selection
+- `GET /api/bmad/personas` now returns 10 personas (was 4)
+- All 9 executive agents available for feature selection
 
 ### Breaking Changes
 
@@ -492,8 +498,8 @@ See: `docs/prp-bmad-workflow-comparison-analysis.md` for full empirical analysis
 
 5. **Test Executive Suite**
    - Navigate to Settings → AI Profiles
-   - Verify you see 7 executive agents (not 3)
-   - Create a feature and select Cerberus, Mary, Walt, or Axel
+   - Verify you see 9 executive agents (not 3)
+   - Create a feature and select Apex or Zen (or Cerberus/Mary/Walt/Axel)
 
 6. **Test Wizard Mode**
    - Create a new feature

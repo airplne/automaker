@@ -44,28 +44,29 @@ const OUTPUT_BATCH_SIZE = 4096; // Smaller batches for lower latency
  *
  * @returns Record of environment variables for secure npm operations
  */
-// DISABLED: npm security interception bypassed - commands pass through without security checks
-// function getSecureNpmEnvironment(): Record<string, string> {
-//   return {
-//     // npm: Block lifecycle scripts by default
-//     npm_config_ignore_scripts: 'true',
-//
-//     // npm: Enable security audits
-//     npm_config_audit: 'true',
-//     npm_config_audit_level: 'moderate',
-//
-//     // npm: Enforce SSL
-//     npm_config_strict_ssl: 'true',
-//
-//     // pnpm: Block lifecycle scripts
-//     PNPM_IGNORE_SCRIPTS: 'true',
-//
-//     // yarn: Block lifecycle scripts (yarn 2+)
-//     YARN_ENABLE_SCRIPTS: 'false',
-//   };
-// }
 function getSecureNpmEnvironment(): Record<string, string> {
-  return {};
+  // Allow bypassing npm security if explicitly requested
+  if (process.env.AUTOMAKER_DISABLE_NPM_SECURITY === 'true') {
+    return {};
+  }
+
+  return {
+    // npm: Block lifecycle scripts by default
+    npm_config_ignore_scripts: 'true',
+
+    // npm: Enable security audits
+    npm_config_audit: 'true',
+    npm_config_audit_level: 'moderate',
+
+    // npm: Enforce SSL
+    npm_config_strict_ssl: 'true',
+
+    // pnpm: Block lifecycle scripts
+    PNPM_IGNORE_SCRIPTS: 'true',
+
+    // yarn: Block lifecycle scripts (yarn 2+)
+    YARN_ENABLE_SCRIPTS: 'false',
+  };
 }
 
 export interface TerminalSession {
@@ -301,12 +302,18 @@ export class TerminalService extends EventEmitter {
     };
 
     // Log when secure npm environment is applied for audit purposes
-    // DISABLED: npm security hardening bypassed
-    logger.info('Terminal session created (npm security hardening DISABLED)', {
-      sessionId: id,
-      cwd,
-      secureEnvKeys: Object.keys(secureEnv),
-    });
+    if (Object.keys(secureEnv).length > 0) {
+      logger.info('Terminal session created with npm security hardening', {
+        sessionId: id,
+        cwd,
+        secureEnvKeys: Object.keys(secureEnv),
+      });
+    } else {
+      logger.info('Terminal session created (npm security hardening DISABLED)', {
+        sessionId: id,
+        cwd,
+      });
+    }
 
     console.log(`[Terminal] Creating session ${id} with shell: ${shell} in ${cwd}`);
 

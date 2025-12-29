@@ -168,24 +168,22 @@ export async function enforcePolicy(
 ): Promise<PolicyEnforcementResult> {
   const classified = classifyCommand(command);
 
-  // 🚨 NPM SECURITY FIREWALL DISABLED FOR DEVELOPMENT 🚨
-  // Always allow all commands regardless of policy
-  const auditEntry = {
-    timestamp: Date.now(),
-    eventType: 'command-rewritten' as const,
-    command: classified,
-  };
+  // DEV MODE BYPASS - check first before any other logic
+  if (process.env.AUTOMAKER_DISABLE_NPM_SECURITY === 'true') {
+    logger.warn('[npm-security] ⚠️ FIREWALL DISABLED FOR DEVELOPMENT');
+    const auditEntry = {
+      timestamp: Date.now(),
+      eventType: 'command-allowed' as const,
+      command: classified,
+    };
+    callbacks.onAuditLog(auditEntry);
+    return {
+      allowed: true,
+      requiresApproval: false,
+      auditEntry,
+    };
+  }
 
-  callbacks.onAuditLog(auditEntry);
-
-  return {
-    allowed: true,
-    requiresApproval: false,
-    auditEntry,
-  };
-
-  // Original policy enforcement logic (DISABLED):
-  /*
   // If policy is 'allow', let everything through but still audit
   if (policy.dependencyInstallPolicy === 'allow') {
     const auditEntry = {
@@ -202,7 +200,6 @@ export async function enforcePolicy(
       auditEntry,
     };
   }
-  */
 
   // Handle high-risk execute commands (npx, etc.)
   if (classified.isHighRiskExecute) {

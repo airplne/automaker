@@ -2308,11 +2308,15 @@ Format your response as a structured markdown document.`;
     // Get provider for this model
     const provider = ProviderFactory.getProviderForModel(model, this.settingsService ?? undefined);
 
+    // Force wizard protocol even when autoLoadClaudeMd=false
+    // WIZARD_SYSTEM_PROMPT must ALWAYS be included for wizard turns to emit markers
+    const wizardSystemPrompt = [systemPrompt, WIZARD_SYSTEM_PROMPT].filter(Boolean).join('\n\n');
+
     // Build SDK options for wizard turn (read-only tools, low max turns)
     const sdkOptions = createCustomOptions({
       cwd: workDir,
       model,
-      systemPrompt: systemPrompt || WIZARD_SYSTEM_PROMPT,
+      systemPrompt: wizardSystemPrompt,
       maxTurns: 3, // Wizard turns are simple, don't need many tool calls
       allowedTools: ['Read', 'Glob', 'Grep'], // Read-only exploration
       maxThinkingTokens,

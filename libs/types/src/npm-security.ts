@@ -152,6 +152,7 @@ export interface NpmSecurityAuditEntry {
   featureId?: string;
   /** Type of security event */
   eventType:
+    | 'command-allowed'
     | 'command-blocked'
     | 'command-rewritten'
     | 'approval-requested'
@@ -172,8 +173,8 @@ export interface NpmSecurityAuditEntry {
  * Uses strict mode with lifecycle scripts blocked to maximize security by default.
  */
 export const DEFAULT_NPM_SECURITY_SETTINGS: NpmSecuritySettings = {
-  dependencyInstallPolicy: 'allow',
-  allowInstallScripts: true,
+  dependencyInstallPolicy: 'strict',
+  allowInstallScripts: false,
   allowedPackagesForRebuild: [],
   enableAuditLog: true,
   auditLogRetentionDays: 30,

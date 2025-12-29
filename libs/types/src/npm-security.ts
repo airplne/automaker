@@ -173,8 +173,9 @@ export interface NpmSecurityAuditEntry {
  * Uses strict mode with lifecycle scripts blocked to maximize security by default.
  */
 export const DEFAULT_NPM_SECURITY_SETTINGS: NpmSecuritySettings = {
-  dependencyInstallPolicy: 'strict',
-  allowInstallScripts: false,
+  // NPM security firewall is intentionally DISABLED in this repo by default.
+  dependencyInstallPolicy: 'allow',
+  allowInstallScripts: true,
   allowedPackagesForRebuild: [],
   enableAuditLog: true,
   auditLogRetentionDays: 30,

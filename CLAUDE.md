@@ -170,4 +170,4 @@ Use `resolveModelString()` from `@automaker/model-resolver` to convert model ali
 - `DATA_DIR` - Data storage directory (default: ./data)
 - `ALLOWED_ROOT_DIRECTORY` - Restrict file operations to specific directory
 - `AUTOMAKER_MOCK_AGENT=true` - Enable mock agent mode for CI testing
-- `AUTOMAKER_DISABLE_NPM_SECURITY=true` - Bypass npm security firewall for local development (disables script blocking, audit checks, and command approval flows)
+- NPM security firewall is currently disabled in code (no env toggle)

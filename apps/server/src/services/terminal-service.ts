@@ -45,28 +45,7 @@ const OUTPUT_BATCH_SIZE = 4096; // Smaller batches for lower latency
  * @returns Record of environment variables for secure npm operations
  */
 function getSecureNpmEnvironment(): Record<string, string> {
-  // Allow bypassing npm security if explicitly requested
-  if (process.env.AUTOMAKER_DISABLE_NPM_SECURITY === 'true') {
-    return {};
-  }
-
-  return {
-    // npm: Block lifecycle scripts by default
-    npm_config_ignore_scripts: 'true',
-
-    // npm: Enable security audits
-    npm_config_audit: 'true',
-    npm_config_audit_level: 'moderate',
-
-    // npm: Enforce SSL
-    npm_config_strict_ssl: 'true',
-
-    // pnpm: Block lifecycle scripts
-    PNPM_IGNORE_SCRIPTS: 'true',
-
-    // yarn: Block lifecycle scripts (yarn 2+)
-    YARN_ENABLE_SCRIPTS: 'false',
-  };
+  return {};
 }
 
 export interface TerminalSession {

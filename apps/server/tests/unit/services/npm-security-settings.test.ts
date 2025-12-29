@@ -43,8 +43,8 @@ describe('npm security settings', () => {
       const settings = await settingsService.getProjectSettings(testProjectPath);
 
       expect(settings.npmSecurity).toBeDefined();
-      expect(settings.npmSecurity?.dependencyInstallPolicy).toBe('strict');
-      expect(settings.npmSecurity?.allowInstallScripts).toBe(false);
+      expect(settings.npmSecurity?.dependencyInstallPolicy).toBe('allow');
+      expect(settings.npmSecurity?.allowInstallScripts).toBe(true);
     });
 
     it('returns saved settings when they exist', async () => {
@@ -88,7 +88,7 @@ describe('npm security settings', () => {
       const projectSettings = await settingsService.getProjectSettings(testProjectPath);
 
       // Project settings should use defaults since file doesn't exist
-      expect(projectSettings.npmSecurity?.dependencyInstallPolicy).toBe('strict');
+      expect(projectSettings.npmSecurity?.dependencyInstallPolicy).toBe('allow');
     });
   });
 
@@ -189,8 +189,8 @@ describe('npm security settings', () => {
 
       const settings = await settingsService.getProjectSettings(testProjectPath);
 
-      expect(settings.npmSecurity?.dependencyInstallPolicy).toBe('strict');
-      expect(settings.npmSecurity?.allowInstallScripts).toBe(false);
+      expect(settings.npmSecurity?.dependencyInstallPolicy).toBe('allow');
+      expect(settings.npmSecurity?.allowInstallScripts).toBe(true);
       expect(settings.npmSecurity?.allowedPackagesForRebuild).toEqual([]);
     });
 
@@ -266,8 +266,8 @@ describe('npm security settings', () => {
       const settings = await settingsService.getProjectSettings(testProjectPath);
 
       // Should use defaults for npmSecurity
-      expect(settings.npmSecurity?.dependencyInstallPolicy).toBe('strict');
-      expect(settings.npmSecurity?.allowInstallScripts).toBe(false);
+      expect(settings.npmSecurity?.dependencyInstallPolicy).toBe('allow');
+      expect(settings.npmSecurity?.allowInstallScripts).toBe(true);
     });
 
     it('preserves other settings when updating npm security', async () => {

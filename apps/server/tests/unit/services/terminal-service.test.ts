@@ -349,10 +349,24 @@ describe('terminal-service.ts', () => {
       expect(service.getSession(session.id)).toBeUndefined();
     });
 
-    it('should apply secure npm environment variables by default', () => {
+    it('should NOT apply secure npm environment variables by default', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
+
+      const keys = [
+        'npm_config_ignore_scripts',
+        'npm_config_audit',
+        'npm_config_audit_level',
+        'npm_config_strict_ssl',
+        'PNPM_IGNORE_SCRIPTS',
+        'YARN_ENABLE_SCRIPTS',
+      ] as const;
+      const previous: Partial<Record<(typeof keys)[number], string | undefined>> = {};
+      for (const key of keys) {
+        previous[key] = process.env[key];
+        delete process.env[key];
+      }
 
       service.createSession({
         cwd: '/test/dir',
@@ -362,19 +376,43 @@ describe('terminal-service.ts', () => {
       const spawnCall = vi.mocked(pty.spawn).mock.calls[0];
       const envArg = spawnCall[2].env as Record<string, string>;
 
-      // Verify secure npm environment variables are set
-      expect(envArg.npm_config_ignore_scripts).toBe('true');
-      expect(envArg.npm_config_audit).toBe('true');
-      expect(envArg.npm_config_audit_level).toBe('moderate');
-      expect(envArg.npm_config_strict_ssl).toBe('true');
-      expect(envArg.PNPM_IGNORE_SCRIPTS).toBe('true');
-      expect(envArg.YARN_ENABLE_SCRIPTS).toBe('false');
+      // Verify secure npm environment variables are NOT set by TerminalService
+      expect(envArg.npm_config_ignore_scripts).toBeUndefined();
+      expect(envArg.npm_config_audit).toBeUndefined();
+      expect(envArg.npm_config_audit_level).toBeUndefined();
+      expect(envArg.npm_config_strict_ssl).toBeUndefined();
+      expect(envArg.PNPM_IGNORE_SCRIPTS).toBeUndefined();
+      expect(envArg.YARN_ENABLE_SCRIPTS).toBeUndefined();
+
+      // Restore env
+      for (const key of keys) {
+        const value = previous[key];
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
     });
 
     it('should allow user env vars to override secure defaults', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
+
+      const keys = [
+        'npm_config_ignore_scripts',
+        'npm_config_audit',
+        'npm_config_audit_level',
+        'npm_config_strict_ssl',
+        'PNPM_IGNORE_SCRIPTS',
+        'YARN_ENABLE_SCRIPTS',
+      ] as const;
+      const previous: Partial<Record<(typeof keys)[number], string | undefined>> = {};
+      for (const key of keys) {
+        previous[key] = process.env[key];
+        delete process.env[key];
+      }
 
       service.createSession({
         cwd: '/test/dir',
@@ -389,9 +427,19 @@ describe('terminal-service.ts', () => {
 
       // User override should take precedence
       expect(envArg.npm_config_ignore_scripts).toBe('false');
-      // Other secure vars should still be set
-      expect(envArg.npm_config_audit).toBe('true');
-      expect(envArg.PNPM_IGNORE_SCRIPTS).toBe('true');
+      // Other secure vars should not be injected
+      expect(envArg.npm_config_audit).toBeUndefined();
+      expect(envArg.PNPM_IGNORE_SCRIPTS).toBeUndefined();
+
+      // Restore env
+      for (const key of keys) {
+        const value = previous[key];
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
     });
   });
 

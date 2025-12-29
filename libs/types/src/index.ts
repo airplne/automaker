@@ -127,3 +127,11 @@ export type {
   NpmSecurityAuditEntry,
 } from './npm-security.js';
 export { DEFAULT_NPM_SECURITY_SETTINGS } from './npm-security.js';
+
+// Pipeline types
+export type {
+  PipelineStep,
+  PipelineConfig,
+  PipelineStatus,
+  FeatureStatusWithPipeline,
+} from './pipeline.js';

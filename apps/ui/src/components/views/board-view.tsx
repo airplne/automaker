@@ -37,6 +37,7 @@ import {
   FollowUpDialog,
   PlanApprovalDialog,
 } from './board-view/dialogs';
+import { WizardQuestionModal } from '@/components/dialogs/wizard-question-modal';
 import { PipelineSettingsDialog } from './board-view/dialogs/pipeline-settings-dialog';
 import { CreateWorktreeDialog } from './board-view/dialogs/create-worktree-dialog';
 import { DeleteWorktreeDialog } from './board-view/dialogs/delete-worktree-dialog';
@@ -232,6 +233,8 @@ export function BoardView() {
   const autoMode = useAutoMode();
   // Get runningTasks from the hook (scoped to current project)
   const runningAutoTasks = autoMode.runningTasks;
+  // Wizard mode state
+  const { wizardQuestion, isWizardModalOpen, setIsWizardModalOpen, handleWizardAnswer } = autoMode;
 
   // Window state hook for compact dialog mode
   const { isMaximized } = useWindowState();
@@ -1319,6 +1322,18 @@ export function BoardView() {
           viewOnly={true}
         />
       )}
+
+      {/* Wizard Question Modal */}
+      <WizardQuestionModal
+        open={isWizardModalOpen}
+        onOpenChange={setIsWizardModalOpen}
+        question={wizardQuestion?.question || null}
+        questionIndex={wizardQuestion?.questionIndex || 0}
+        totalQuestions={wizardQuestion?.totalQuestions || 5}
+        featureId={wizardQuestion?.featureId || ''}
+        projectPath={wizardQuestion?.projectPath || ''}
+        onSubmit={handleWizardAnswer}
+      />
 
       {/* Create Worktree Dialog */}
       <CreateWorktreeDialog

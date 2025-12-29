@@ -257,11 +257,35 @@ export type AutoModeEvent =
       estimatedTime?: string;
     }
   | {
+      type: 'auto_mode_wizard_question';
+      featureId: string;
+      projectPath?: string;
+      question: {
+        id: string;
+        question: string;
+        header: string;
+        options: Array<{
+          label: string;
+          description: string;
+          value: string;
+        }>;
+        multiSelect: boolean;
+      };
+      questionIndex: number; // 0-based index of current question
+      totalQuestions?: number; // Max questions (2-5)
+    }
+  | {
+      type: 'auto_mode_wizard_complete';
+      featureId: string;
+      projectPath?: string;
+      answers: Record<string, string | string[]>;
+    }
+  | {
       type: 'plan_approval_required';
       featureId: string;
       projectPath?: string;
       planContent: string;
-      planningMode: 'lite' | 'spec' | 'full';
+      planningMode: 'lite' | 'spec' | 'full' | 'wizard';
       planVersion?: number;
     }
   | {
@@ -269,7 +293,7 @@ export type AutoModeEvent =
       featureId: string;
       projectPath?: string;
       planContent: string;
-      planningMode: 'lite' | 'spec' | 'full';
+      planningMode: 'lite' | 'spec' | 'full' | 'wizard';
     }
   | {
       type: 'plan_approved';
@@ -295,7 +319,7 @@ export type AutoModeEvent =
   | {
       type: 'planning_started';
       featureId: string;
-      mode: 'lite' | 'spec' | 'full';
+      mode: 'lite' | 'spec' | 'full' | 'wizard';
       message: string;
     }
   | {
@@ -502,6 +526,18 @@ export interface AutoModeAPI {
   ) => Promise<{
     success: boolean;
     error?: string;
+  }>;
+
+  wizardAnswer: (
+    projectPath: string,
+    featureId: string,
+    questionId: string,
+    answer: string | string[]
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    questionsRemaining?: number;
+    wizardComplete?: boolean;
   }>;
 
   onEvent: (callback: (event: AutoModeEvent) => void) => () => void;

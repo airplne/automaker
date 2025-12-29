@@ -21,6 +21,38 @@ export interface FeatureTextFilePath {
   [key: string]: unknown;
 }
 
+/**
+ * WizardOption - Single option in a wizard question
+ */
+export interface WizardOption {
+  label: string; // Display label (e.g., "Comprehensive")
+  description: string; // Help text (e.g., "Includes deployment notes, security...")
+  value: string; // Value to store (e.g., "comprehensive")
+}
+
+/**
+ * WizardQuestion - A single wizard question
+ */
+export interface WizardQuestion {
+  id: string; // Question ID (e.g., "Q1", "Q2")
+  question: string; // Full question text
+  header: string; // Short label (max 12 chars, e.g., "Template Type")
+  options: WizardOption[]; // 2-4 choices
+  multiSelect: boolean; // Whether user can pick multiple options
+}
+
+/**
+ * WizardState - State of the wizard question flow for a feature
+ */
+export interface WizardState {
+  status: 'pending' | 'asking' | 'complete';
+  currentQuestionId?: string;
+  questionsAsked: WizardQuestion[];
+  answers: Record<string, string | string[]>; // questionId -> selected value(s)
+  startedAt?: string;
+  completedAt?: string;
+}
+
 export interface Feature {
   id: string;
   title?: string;
@@ -60,6 +92,8 @@ export interface Feature {
     tasksCompleted?: number;
     tasksTotal?: number;
   };
+  /** Wizard mode state - questions asked and answers provided */
+  wizard?: WizardState;
   error?: string;
   summary?: string;
   startedAt?: string;

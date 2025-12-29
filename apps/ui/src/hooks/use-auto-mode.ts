@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
@@ -60,6 +60,22 @@ export function useAutoMode() {
 
   // Check if we can start a new task based on concurrency limit
   const canStartNewTask = runningAutoTasks.length < maxConcurrency;
+
+  // Wizard state
+  const [wizardQuestion, setWizardQuestion] = useState<{
+    question: {
+      id: string;
+      question: string;
+      header: string;
+      options: Array<{ label: string; description: string; value: string }>;
+      multiSelect: boolean;
+    };
+    featureId: string;
+    projectPath: string;
+    questionIndex: number;
+    totalQuestions: number;
+  } | null>(null);
+  const [isWizardModalOpen, setIsWizardModalOpen] = useState(false);
 
   // Handle auto mode events - listen globally for all projects
   useEffect(() => {
@@ -313,6 +329,44 @@ export function useAutoMode() {
             });
           }
           break;
+
+        case 'auto_mode_wizard_question':
+          // Wizard question requires user input
+          if ('question' in event && event.featureId) {
+            const wizardEvent = event as Extract<
+              AutoModeEvent,
+              { type: 'auto_mode_wizard_question' }
+            >;
+            console.log(`[AutoMode] Wizard question for ${event.featureId}:`, wizardEvent.question);
+            setWizardQuestion({
+              question: wizardEvent.question,
+              featureId: wizardEvent.featureId,
+              projectPath: wizardEvent.projectPath || '',
+              questionIndex: wizardEvent.questionIndex,
+              totalQuestions: wizardEvent.totalQuestions || 5,
+            });
+            setIsWizardModalOpen(true);
+            addAutoModeActivity({
+              featureId: event.featureId,
+              type: 'progress',
+              message: `Wizard question: ${wizardEvent.question.header}`,
+            });
+          }
+          break;
+
+        case 'auto_mode_wizard_complete':
+          // Wizard phase completed
+          if (event.featureId) {
+            console.log(`[AutoMode] Wizard completed for ${event.featureId}`);
+            setWizardQuestion(null);
+            setIsWizardModalOpen(false);
+            addAutoModeActivity({
+              featureId: event.featureId,
+              type: 'progress',
+              message: 'Wizard phase complete, proceeding with implementation...',
+            });
+          }
+          break;
       }
     });
 
@@ -390,6 +444,32 @@ export function useAutoMode() {
     [currentProject, removeRunningTask, addAutoModeActivity]
   );
 
+  // Handle wizard answer submission
+  const handleWizardAnswer = useCallback(
+    async (questionId: string, answer: string | string[]) => {
+      if (!wizardQuestion) return;
+
+      try {
+        const api = getElectronAPI();
+        if (!api?.autoMode?.wizardAnswer) {
+          throw new Error('Wizard answer API not available');
+        }
+
+        await api.autoMode.wizardAnswer(
+          wizardQuestion.projectPath,
+          wizardQuestion.featureId,
+          questionId,
+          answer
+        );
+        // Modal will close when next question or wizard_complete event arrives
+      } catch (error) {
+        console.error('[useAutoMode] Failed to submit wizard answer:', error);
+        throw error;
+      }
+    },
+    [wizardQuestion]
+  );
+
   return {
     isRunning: isAutoModeRunning,
     runningTasks: runningAutoTasks,
@@ -398,5 +478,9 @@ export function useAutoMode() {
     start,
     stop,
     stopFeature,
+    wizardQuestion,
+    isWizardModalOpen,
+    setIsWizardModalOpen,
+    handleWizardAnswer,
   };
 }

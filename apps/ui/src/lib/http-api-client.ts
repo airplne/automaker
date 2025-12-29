@@ -602,6 +602,18 @@ export class HttpApiClient implements ElectronAPI {
         editedPlan,
         feedback,
       }),
+    wizardAnswer: (
+      projectPath: string,
+      featureId: string,
+      questionId: string,
+      answer: string | string[]
+    ) =>
+      this.post('/api/auto-mode/wizard-answer', {
+        projectPath,
+        featureId,
+        questionId,
+        answer,
+      }),
     onEvent: (callback: (event: AutoModeEvent) => void) => {
       return this.subscribeToEvent('auto-mode:event', callback as EventCallback);
     },

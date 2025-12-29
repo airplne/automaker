@@ -16,6 +16,8 @@ import type {
   PartySynthesisResult,
   ResolvedPersona,
   ResolvedAgentCollab,
+  PipelineStep,
+  PlanningMode,
 } from '@automaker/types';
 import {
   buildPromptWithImages,
@@ -47,9 +49,6 @@ import {
 } from '../lib/settings-helpers.js';
 
 const execAsync = promisify(exec);
-
-// Planning mode types for spec-driven development
-type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 
 interface ParsedTask {
   id: string; // e.g., "T001"
@@ -228,6 +227,23 @@ After completing all tasks in a phase, output:
 This allows real-time progress tracking during implementation.`,
 };
 
+const WIZARD_SYSTEM_PROMPT = `You are in WIZARD MODE. Your job is to ask 2-5 clarifying questions before planning.
+
+## Output Format
+For each question, output exactly:
+   [WIZARD_QUESTION]{"id":"Q1","header":"Short Label","question":"Full question?","multiSelect":false,"options":[{"label":"Option 1","description":"Description","value":"value1"},{"label":"Option 2","description":"Description","value":"value2"}]}
+
+When done asking questions:
+   [WIZARD_COMPLETE]
+
+## Rules
+- Ask 2-5 total questions (not more)
+- Each question must have 2-4 options
+- Questions should clarify: scope, approach, constraints, or preferences
+- Be specific to the task, not generic
+- After [WIZARD_COMPLETE], you will write the plan using all answers
+`;
+
 const PARTY_SYNTHESIS_SCHEMA = {
   type: 'object',
   properties: {
@@ -397,6 +413,16 @@ export class AutoModeService {
   private autoLoopAbortController: AbortController | null = null;
   private config: AutoModeConfig | null = null;
   private pendingApprovals = new Map<string, PendingApproval>();
+  private pendingWizardAnswers = new Map<
+    string,
+    {
+      resolve: (answer: string | string[]) => void;
+      reject: (reason: Error) => void;
+      featureId: string;
+      projectPath: string;
+      questionId: string;
+    }
+  >();
   private settingsService: SettingsService | null = null;
 
   constructor(events: EventEmitter, settingsService?: SettingsService) {
@@ -1989,6 +2015,433 @@ Format your response as a structured markdown document.`;
     }
   }
 
+  // ========================================
+  // WIZARD MODE METHODS
+  // ========================================
+
+  /**
+   * Submit a wizard answer and continue the wizard flow.
+   * Called from the /wizard-answer API endpoint.
+   */
+  async submitWizardAnswer(
+    projectPath: string,
+    featureId: string,
+    questionId: string,
+    answer: string | string[]
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    questionsRemaining?: number;
+    wizardComplete?: boolean;
+  }> {
+    console.log(
+      `[AutoMode] submitWizardAnswer called for feature ${featureId}, question ${questionId}`
+    );
+
+    const pending = this.pendingWizardAnswers.get(featureId);
+    if (!pending) {
+      return { success: false, error: `No pending wizard question for feature ${featureId}` };
+    }
+
+    // Update feature with the answer
+    await this.updateFeatureWizardState(projectPath, featureId, {
+      answers: { [questionId]: answer },
+    });
+
+    // Load feature to get current question count
+    const feature = await this.loadFeature(projectPath, featureId);
+    const questionsAsked = feature?.wizard?.questionsAsked?.length || 0;
+    const MAX_QUESTIONS = 5;
+
+    // Calculate remaining questions (could be 0 to MAX_QUESTIONS - current)
+    const questionsRemaining = Math.max(0, MAX_QUESTIONS - questionsAsked);
+
+    // Resolve the promise to continue wizard loop execution
+    pending.resolve(answer);
+    this.pendingWizardAnswers.delete(featureId);
+
+    return {
+      success: true,
+      questionsRemaining,
+      wizardComplete: false, // Will be true only after [WIZARD_COMPLETE] is emitted
+    };
+  }
+
+  /**
+   * Wait for user to answer a wizard question.
+   * Returns a promise that resolves when submitWizardAnswer is called.
+   */
+  private waitForWizardAnswer(
+    featureId: string,
+    projectPath: string,
+    questionId: string
+  ): Promise<string | string[]> {
+    console.log(
+      `[AutoMode] Waiting for wizard answer for feature ${featureId}, question ${questionId}`
+    );
+    return new Promise((resolve, reject) => {
+      this.pendingWizardAnswers.set(featureId, {
+        resolve,
+        reject,
+        featureId,
+        projectPath,
+        questionId,
+      });
+    });
+  }
+
+  /**
+   * Update wizard state in feature.json
+   */
+  private async updateFeatureWizardState(
+    projectPath: string,
+    featureId: string,
+    updates: {
+      status?: 'pending' | 'asking' | 'complete';
+      currentQuestionId?: string;
+      questionsAsked?: Array<{
+        id: string;
+        question: string;
+        header: string;
+        options: Array<{ label: string; description: string; value: string }>;
+        multiSelect: boolean;
+      }>;
+      answers?: Record<string, string | string[]>;
+      startedAt?: string;
+      completedAt?: string;
+    }
+  ): Promise<void> {
+    const featureDir = getFeatureDir(projectPath, featureId);
+    const featurePath = path.join(featureDir, 'feature.json');
+
+    try {
+      const data = (await secureFs.readFile(featurePath, 'utf-8')) as string;
+      const feature = JSON.parse(data);
+
+      // Initialize wizard state if needed
+      if (!feature.wizard) {
+        feature.wizard = {
+          status: 'pending',
+          questionsAsked: [],
+          answers: {},
+        };
+      }
+
+      // Apply updates
+      if (updates.status) feature.wizard.status = updates.status;
+      if (updates.currentQuestionId) feature.wizard.currentQuestionId = updates.currentQuestionId;
+      if (updates.questionsAsked) {
+        feature.wizard.questionsAsked = [
+          ...feature.wizard.questionsAsked,
+          ...updates.questionsAsked,
+        ];
+      }
+      if (updates.answers) {
+        feature.wizard.answers = { ...feature.wizard.answers, ...updates.answers };
+      }
+      if (updates.startedAt) feature.wizard.startedAt = updates.startedAt;
+      if (updates.completedAt) feature.wizard.completedAt = updates.completedAt;
+
+      feature.updatedAt = new Date().toISOString();
+      await secureFs.writeFile(featurePath, JSON.stringify(feature, null, 2));
+    } catch (error) {
+      console.error(`[AutoMode] Failed to update wizard state for ${featureId}:`, error);
+    }
+  }
+
+  /**
+   * Run wizard mode as a multi-turn loop.
+   * Makes one LLM call per question, waits for answer, then continues.
+   * Returns the collected answers when wizard is complete.
+   */
+  private async runWizardLoop(params: {
+    projectPath: string;
+    workDir: string;
+    featureId: string;
+    feature: Feature;
+    model: string;
+    systemPrompt?: string;
+    maxThinkingTokens?: number;
+    abortController: AbortController;
+    autoLoadClaudeMd: boolean;
+  }): Promise<{ answers: Record<string, string | string[]>; questionsAsked: number }> {
+    const {
+      projectPath,
+      workDir,
+      featureId,
+      feature,
+      model,
+      systemPrompt,
+      maxThinkingTokens,
+      abortController,
+      autoLoadClaudeMd,
+    } = params;
+    const MIN_QUESTIONS = 2;
+    const MAX_QUESTIONS = 5;
+    let questionsAsked = feature.wizard?.questionsAsked?.length || 0;
+    let answers = { ...(feature.wizard?.answers || {}) };
+    let wizardComplete = false;
+    if (questionsAsked === 0) {
+      await this.updateFeatureWizardState(projectPath, featureId, {
+        status: 'asking',
+        startedAt: new Date().toISOString(),
+      });
+    }
+    console.log(
+      `[AutoMode] Starting wizard loop for feature ${featureId}, ${questionsAsked} questions already asked`
+    );
+    while (!wizardComplete && questionsAsked < MAX_QUESTIONS) {
+      if (abortController.signal.aborted) throw new Error('Wizard cancelled');
+      const turnPrompt = this.buildWizardTurnPrompt(feature, questionsAsked, answers);
+      const turnResult = await this.executeWizardTurn({
+        workDir,
+        featureId,
+        prompt: turnPrompt,
+        model,
+        systemPrompt,
+        maxThinkingTokens,
+        abortController,
+        autoLoadClaudeMd,
+        projectPath,
+      });
+      if (turnResult.type === 'question') {
+        const question = turnResult.question;
+        questionsAsked++;
+        console.log(
+          `[AutoMode] Wizard Q${questionsAsked} for feature ${featureId}: ${question.id}`
+        );
+        console.log(
+          `[AutoMode] Emitting wizard question event: index=${questionsAsked - 1}, total=${MAX_QUESTIONS}`
+        );
+        await this.updateFeatureWizardState(projectPath, featureId, {
+          status: 'asking',
+          currentQuestionId: question.id,
+          questionsAsked: [question],
+        });
+        this.emitAutoModeEvent('auto_mode_wizard_question', {
+          featureId,
+          projectPath,
+          question,
+          questionIndex: questionsAsked - 1,
+          totalQuestions: MAX_QUESTIONS,
+        });
+        const answer = await this.waitForWizardAnswer(featureId, projectPath, question.id);
+        answers[question.id] = answer;
+        console.log(`[AutoMode] Wizard answer for ${question.id}: ${JSON.stringify(answer)}`);
+        const updatedFeature = await this.loadFeature(projectPath, featureId);
+        if (updatedFeature) Object.assign(feature, updatedFeature);
+      } else if (turnResult.type === 'complete') {
+        if (questionsAsked < MIN_QUESTIONS) {
+          console.log(
+            `[AutoMode] Wizard tried to complete with only ${questionsAsked} questions (min ${MIN_QUESTIONS}), forcing another question`
+          );
+          continue;
+        }
+        wizardComplete = true;
+        console.log(
+          `[AutoMode] Wizard complete for feature ${featureId} after ${questionsAsked} questions`
+        );
+      }
+    }
+    if (questionsAsked >= MAX_QUESTIONS && !wizardComplete) {
+      console.log(`[AutoMode] Wizard hit max ${MAX_QUESTIONS} questions, forcing completion`);
+      wizardComplete = true;
+    }
+    await this.updateFeatureWizardState(projectPath, featureId, {
+      status: 'complete',
+      completedAt: new Date().toISOString(),
+    });
+    this.emitAutoModeEvent('auto_mode_wizard_complete', { featureId, projectPath, answers });
+    return { answers, questionsAsked };
+  }
+
+  private buildWizardTurnPrompt(
+    feature: Feature,
+    questionsAsked: number,
+    answers: Record<string, string | string[]>
+  ): string {
+    let prompt = `You are in WIZARD MODE gathering requirements.\n\nTASK: ${feature.description}`;
+    if (questionsAsked > 0)
+      prompt += `\n\nQuestions: ${questionsAsked}, Answers: ${JSON.stringify(answers)}`;
+    return prompt;
+  }
+
+  /**
+   * Execute a single wizard turn - makes one LLM call and parses the marker.
+   * Returns either a question or completion signal.
+   */
+  private async executeWizardTurn(params: {
+    workDir: string;
+    featureId: string;
+    prompt: string;
+    model: string;
+    systemPrompt?: string;
+    maxThinkingTokens?: number;
+    abortController: AbortController;
+    autoLoadClaudeMd: boolean;
+    projectPath: string;
+  }): Promise<
+    | {
+        type: 'question';
+        question: {
+          id: string;
+          header: string;
+          question: string;
+          multiSelect: boolean;
+          options: Array<{ label: string; description: string; value: string }>;
+        };
+      }
+    | { type: 'complete' }
+  > {
+    const {
+      workDir,
+      featureId,
+      prompt,
+      model,
+      systemPrompt,
+      maxThinkingTokens,
+      abortController,
+      autoLoadClaudeMd,
+      projectPath,
+    } = params;
+
+    // Get provider for this model
+    const provider = ProviderFactory.getProviderForModel(model, this.settingsService ?? undefined);
+
+    // Build SDK options for wizard turn (read-only tools, low max turns)
+    const sdkOptions = createCustomOptions({
+      cwd: workDir,
+      model,
+      systemPrompt: systemPrompt || WIZARD_SYSTEM_PROMPT,
+      maxTurns: 3, // Wizard turns are simple, don't need many tool calls
+      allowedTools: ['Read', 'Glob', 'Grep'], // Read-only exploration
+      maxThinkingTokens,
+      abortController,
+      autoLoadClaudeMd,
+    });
+
+    const executeOptions: ExecuteOptions = {
+      prompt,
+      model: sdkOptions.model!,
+      cwd: workDir,
+      systemPrompt: sdkOptions.systemPrompt,
+      settingSources: sdkOptions.settingSources,
+      maxTurns: sdkOptions.maxTurns,
+      allowedTools: sdkOptions.allowedTools as string[] | undefined,
+      maxThinkingTokens: sdkOptions.maxThinkingTokens,
+      abortController,
+    };
+
+    console.log(`[AutoMode] Executing wizard turn for feature ${featureId}`);
+
+    const stream = provider.executeQuery(executeOptions);
+    let responseText = '';
+
+    // Collect the response
+    for await (const msg of stream) {
+      if (msg.type === 'assistant' && msg.message?.content) {
+        for (const block of msg.message.content) {
+          if (block.type === 'text') {
+            responseText += block.text || '';
+          }
+        }
+      }
+    }
+
+    console.log(
+      `[AutoMode] Wizard turn response (${responseText.length} chars) for feature ${featureId}`
+    );
+
+    // Save wizard turn output to agent-output.md (append)
+    const featureDir = getFeatureDir(projectPath, featureId);
+    const outputPath = path.join(featureDir, 'agent-output.md');
+    try {
+      await secureFs.mkdir(featureDir, { recursive: true });
+      let existing = '';
+      try {
+        existing = (await secureFs.readFile(outputPath, 'utf-8')) as string;
+      } catch {
+        // No existing file
+      }
+      const separator = existing ? '\n\n---\n\n' : '';
+      await secureFs.writeFile(outputPath, existing + separator + responseText);
+    } catch (error) {
+      console.error(`[AutoMode] Failed to save wizard turn output:`, error);
+    }
+
+    // Parse for [WIZARD_QUESTION] marker
+    const questionMatch = responseText.match(/\[WIZARD_QUESTION\](\{[\s\S]*?\})/);
+    if (questionMatch) {
+      try {
+        const questionPayload = JSON.parse(questionMatch[1]);
+
+        // Validate the question structure
+        if (
+          !questionPayload.id ||
+          !questionPayload.question ||
+          !Array.isArray(questionPayload.options)
+        ) {
+          console.error(`[AutoMode] Invalid wizard question structure:`, questionPayload);
+          throw new Error('Invalid question structure');
+        }
+
+        return {
+          type: 'question',
+          question: {
+            id: questionPayload.id,
+            header: questionPayload.header || 'Question',
+            question: questionPayload.question,
+            multiSelect: questionPayload.multiSelect === true,
+            options: questionPayload.options.map((opt: any) => ({
+              label: opt.label || '',
+              description: opt.description || '',
+              value: opt.value || opt.label || '',
+            })),
+          },
+        };
+      } catch (parseError) {
+        console.error(`[AutoMode] Failed to parse wizard question JSON:`, parseError);
+        // Fall through to complete check
+      }
+    }
+
+    // Check for [WIZARD_COMPLETE] marker
+    if (responseText.includes('[WIZARD_COMPLETE]')) {
+      return { type: 'complete' };
+    }
+
+    // If no valid marker found, log warning and treat as needing more questions
+    console.warn(
+      `[AutoMode] Wizard turn produced no valid marker for feature ${featureId}, treating as needing more input`
+    );
+
+    // Return a fallback question asking for clarification
+    return {
+      type: 'question',
+      question: {
+        id: `Q_fallback_${Date.now()}`,
+        header: 'Clarify',
+        question:
+          'I need more information to proceed. What aspect is most important for this feature?',
+        multiSelect: false,
+        options: [
+          {
+            label: 'Performance',
+            description: 'Speed and efficiency are critical',
+            value: 'performance',
+          },
+          {
+            label: 'Simplicity',
+            description: 'Keep it simple and maintainable',
+            value: 'simplicity',
+          },
+          { label: 'Features', description: 'Include all requested features', value: 'features' },
+          { label: 'Testing', description: 'Comprehensive test coverage', value: 'testing' },
+        ],
+      },
+    };
+  }
+
   private async loadPendingFeatures(projectPath: string): Promise<Feature[]> {
     // Features are stored in .automaker directory
     const featuresDir = getFeaturesDir(projectPath);
@@ -2063,6 +2516,12 @@ Format your response as a structured markdown document.`;
 
     if (mode === 'skip') {
       return ''; // No planning phase
+    }
+
+    if (mode === 'wizard') {
+      // Wizard mode - the prompt is built differently (by runWizardLoop)
+      // Return empty here since wizard handles its own prompts
+      return '';
     }
 
     // For lite mode, use the approval variant if requirePlanApproval is true
@@ -2426,6 +2885,7 @@ This helps parse your summary correctly in the output logs.`;
     const planningModeRequiresApproval =
       planningMode === 'spec' ||
       planningMode === 'full' ||
+      planningMode === 'wizard' || // Wizard generates specs after Q&A
       (planningMode === 'lite' && options?.requirePlanApproval === true);
     const requiresApproval = planningModeRequiresApproval && options?.requirePlanApproval === true;
 
@@ -2544,7 +3004,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     );
 
     // Build prompt content with images using utility
-    const { content: promptContent } = await buildPromptWithImages(
+    let { content: promptContent } = await buildPromptWithImages(
       prompt,
       imagePaths,
       workDir,
@@ -2597,10 +3057,113 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     const initialProvider = useSeparatePlanner ? planningProvider : executionProvider;
     const initialModel = useSeparatePlanner ? plannerModel : executionModel;
 
+    // ========================================
+    // WIZARD MODE HANDLING
+    // Run wizard loop BEFORE main execution to gather requirements
+    // ========================================
+    if (planningMode === 'wizard') {
+      console.log(`[AutoMode] Running wizard loop for feature ${featureId}`);
+
+      // Emit planning started event
+      this.emitAutoModeEvent('planning_started', {
+        featureId,
+        mode: 'wizard',
+        message: 'Starting wizard Q&A phase...',
+      });
+
+      // Load feature for wizard context
+      const wizardFeature = await this.loadFeature(finalProjectPath, featureId);
+      if (!wizardFeature) {
+        throw new Error(`Feature ${featureId} not found for wizard mode`);
+      }
+
+      // Run the wizard loop
+      const wizardResult = await this.runWizardLoop({
+        projectPath: finalProjectPath,
+        workDir,
+        featureId,
+        feature: wizardFeature,
+        model: finalModel,
+        systemPrompt:
+          typeof sdkOptions.systemPrompt === 'string' ? sdkOptions.systemPrompt : undefined,
+        maxThinkingTokens: sdkOptions.maxThinkingTokens,
+        abortController,
+        autoLoadClaudeMd,
+      });
+
+      console.log(
+        `[AutoMode] Wizard complete with ${wizardResult.questionsAsked} questions, proceeding to plan generation`
+      );
+
+      // Build a new prompt that includes wizard answers for plan generation
+      const answersContext = Object.entries(wizardResult.answers)
+        .map(([qId, answer]) => {
+          const answerStr = Array.isArray(answer) ? answer.join(', ') : answer;
+          return `${qId}: ${answerStr}`;
+        })
+        .join('\n');
+
+      // Reload feature to get latest state with all Q&A
+      const updatedFeature = await this.loadFeature(finalProjectPath, featureId);
+      const questionsContext =
+        updatedFeature?.wizard?.questionsAsked
+          ?.map((q, i) => {
+            const answer = wizardResult.answers[q.id];
+            const answerStr = Array.isArray(answer) ? answer.join(', ') : answer;
+            return `**Q${i + 1}: ${q.question}**\nAnswer: ${answerStr}`;
+          })
+          .join('\n\n') || '';
+
+      // Modify the prompt to be a plan generation prompt with wizard context
+      const wizardPlanPrompt = `## Wizard Requirements Gathered
+
+The user answered the following clarifying questions:
+
+${questionsContext}
+
+---
+
+## Feature to Implement
+
+${wizardFeature.description}
+
+${wizardFeature.spec ? `\n## Additional Specification\n${wizardFeature.spec}` : ''}
+
+---
+
+## Your Task
+
+Based on the wizard answers above, create a detailed implementation plan.
+Include all the user's preferences and selections in your plan.
+
+When your plan is complete, output the marker:
+[SPEC_GENERATED]
+
+Then proceed with implementation.
+`;
+
+      // Replace the prompt content for the main execution
+      promptContent = wizardPlanPrompt;
+
+      // Force the planning mode to generate a spec (so approval flow kicks in)
+      // The wizard mode is now complete, switch to spec-like behavior
+    }
+
+    // Recalculate planningPrompt after wizard may have updated promptContent
+    // This ensures wizard answers are incorporated into the plan generation
+    const finalPlanningPrompt: ExecuteOptions['prompt'] = useSeparatePlanner
+      ? this.prependPlannerContextToPrompt(promptContent, {
+          repoMap: await this.buildRepoMapForPlanner(workDir),
+          allowedTools: planningAllowedTools,
+          plannerModel,
+          executionModel,
+        })
+      : promptContent;
+
     // Execute initial call (planning/spec generation or full execution when planning is skipped)
     const stream = initialProvider.executeQuery({
       ...executeOptions,
-      prompt: planningPrompt,
+      prompt: finalPlanningPrompt,
       model: initialModel,
       allowedTools: planningAllowedTools,
     });

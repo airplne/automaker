@@ -11,6 +11,7 @@ import {
   Eye,
   RefreshCw,
   Sparkles,
+  Wand2,
 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import type { PlanSpec } from '@/store/app-store';
 
-export type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
+export type PlanningMode = 'skip' | 'lite' | 'spec' | 'full' | 'wizard';
 
 // Re-export for backwards compatibility
 export type { ParsedTask, PlanSpec } from '@/store/app-store';
@@ -79,6 +80,16 @@ const modes = [
     borderColor: 'border-amber-500/30',
     badge: 'Approval Required',
   },
+  {
+    value: 'wizard' as const,
+    label: 'Wizard',
+    description: 'Interactive Q&A before planning',
+    icon: Wand2,
+    color: 'text-cyan-500',
+    bgColor: 'bg-cyan-500/10',
+    borderColor: 'border-cyan-500/30',
+    badge: 'Interactive',
+  },
 ];
 
 export function PlanningModeSelector({
@@ -98,7 +109,7 @@ export function PlanningModeSelector({
 }: PlanningModeSelectorProps) {
   const [showPreview, setShowPreview] = useState(false);
   const selectedMode = modes.find((m) => m.value === mode);
-  const requiresApproval = mode === 'spec' || mode === 'full';
+  const requiresApproval = mode === 'spec' || mode === 'full' || mode === 'wizard';
   const canGenerate = requiresApproval && featureDescription?.trim() && !isGenerating;
   const hasSpec = planSpec && planSpec.content;
 
@@ -135,7 +146,7 @@ export function PlanningModeSelector({
       </div>
 
       {/* Mode Selection Cards */}
-      <div className={cn('grid gap-2', compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4')}>
+      <div className={cn('grid gap-2', compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-5')}>
         {modes.map((m) => {
           const isSelected = mode === m.value;
           const Icon = m.icon;
@@ -182,10 +193,16 @@ export function PlanningModeSelector({
                         'text-[9px] px-1 py-0.5 rounded font-medium',
                         m.badge === 'Default'
                           ? 'bg-emerald-500/15 text-emerald-500'
-                          : 'bg-amber-500/15 text-amber-500'
+                          : m.badge === 'Interactive'
+                            ? 'bg-cyan-500/15 text-cyan-500'
+                            : 'bg-amber-500/15 text-amber-500'
                       )}
                     >
-                      {m.badge === 'Default' ? 'Default' : 'Review'}
+                      {m.badge === 'Default'
+                        ? 'Default'
+                        : m.badge === 'Interactive'
+                          ? 'Interactive'
+                          : 'Review'}
                     </span>
                   )}
                 </div>
@@ -338,7 +355,9 @@ export function PlanningModeSelector({
         <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3">
           {mode === 'skip'
             ? 'The agent will start implementing immediately without creating a plan or spec.'
-            : "The agent will create a planning outline before implementing, but won't wait for approval."}
+            : mode === 'wizard'
+              ? 'The agent will ask you clarifying questions to understand requirements before planning.'
+              : "The agent will create a planning outline before implementing, but won't wait for approval."}
         </p>
       )}
     </div>

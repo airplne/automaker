@@ -560,7 +560,7 @@ export function sanitizeCommandForLogging(command: string): string {
   // Match env vars that likely contain secrets
   // Pattern: WORD_KEY=value, WORD_TOKEN=value, WORD_SECRET=value, WORD_PASSWORD=value, WORD_AUTH=value, WORD_CREDENTIAL=value
   return command.replace(
-    /\b([A-Z_][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL)[A-Z0-9_]*)=\S+/gi,
+    /\b([A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL)[A-Z0-9_]*)=\S+/gi,
     '$1=***REDACTED***'
   );
 }

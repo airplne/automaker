@@ -15,8 +15,8 @@ This fork adds three major feature sets to AutoMaker:
 2. **Wizard Planning Mode** - Interactive Q&A workflow before task execution
 3. **Bug Fixes & Improvements** - Multiple stability and UX fixes
 
-**Commits ahead of upstream/main:** 23
-**Diff Summary:** 1205 files changed, 246118 insertions(+), 471 deletions(-)
+**Commits ahead of upstream/main:** 24
+**Diff Summary:** 1206 files changed, 246505 insertions(+), 471 deletions(-)
 
 **Status:** Ready for review and consideration for upstream merge
 

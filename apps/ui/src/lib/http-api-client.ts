@@ -797,6 +797,8 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/github/validation-mark-viewed', { projectPath, issueNumber }),
     onValidationEvent: (callback: (event: IssueValidationEvent) => void) =>
       this.subscribeToEvent('issue-validation:event', callback as EventCallback),
+    getIssueComments: (projectPath: string, issueNumber: number, cursor?: string) =>
+      this.post('/api/github/issue-comments', { projectPath, issueNumber, cursor }),
   };
 
   // Workspace API
@@ -957,6 +959,20 @@ export class HttpApiClient implements ElectronAPI {
         recentFolders: string[];
         worktreePanelCollapsed: boolean;
         lastSelectedSessionByProject: Record<string, string>;
+        mcpServers?: Array<{
+          id: string;
+          name: string;
+          description?: string;
+          type?: 'stdio' | 'sse' | 'http';
+          command?: string;
+          args?: string[];
+          env?: Record<string, string>;
+          url?: string;
+          headers?: Record<string, string>;
+          enabled?: boolean;
+        }>;
+        mcpAutoApproveTools?: boolean;
+        mcpUnrestrictedTools?: boolean;
       };
       error?: string;
     }> => this.get('/api/settings/global'),
@@ -1142,6 +1158,42 @@ export class HttpApiClient implements ElectronAPI {
     onEvent: (callback: (event: BacklogPlanEvent) => void): (() => void) => {
       return this.subscribeToEvent('backlog-plan:event', callback as EventCallback);
     },
+  };
+
+  // MCP API - Test MCP server connections and list tools
+  // SECURITY: Only accepts serverId, not arbitrary serverConfig, to prevent
+  // drive-by command execution attacks. Servers must be saved first.
+  mcp = {
+    testServer: (
+      serverId: string
+    ): Promise<{
+      success: boolean;
+      tools?: Array<{
+        name: string;
+        description?: string;
+        inputSchema?: Record<string, unknown>;
+        enabled: boolean;
+      }>;
+      error?: string;
+      connectionTime?: number;
+      serverInfo?: {
+        name?: string;
+        version?: string;
+      };
+    }> => this.post('/api/mcp/test', { serverId }),
+
+    listTools: (
+      serverId: string
+    ): Promise<{
+      success: boolean;
+      tools?: Array<{
+        name: string;
+        description?: string;
+        inputSchema?: Record<string, unknown>;
+        enabled: boolean;
+      }>;
+      error?: string;
+    }> => this.post('/api/mcp/tools', { serverId }),
   };
 
   // Pipeline API - custom workflow pipeline steps

@@ -52,6 +52,8 @@ import { createBacklogPlanRoutes } from './routes/backlog-plan/index.js';
 import { createBmadRoutes } from './routes/bmad/index.js';
 import { createNpmSecurityRoutes } from './routes/npm-security/index.js';
 import { cleanupStaleValidations } from './routes/github/routes/validation-common.js';
+import { createMCPRoutes } from './routes/mcp/index.js';
+import { MCPTestService } from './services/mcp-test-service.js';
 import { createPipelineRoutes } from './routes/pipeline/index.js';
 import { pipelineService } from './services/pipeline-service.js';
 
@@ -94,9 +96,13 @@ if (ENABLE_REQUEST_LOGGING) {
     })
   );
 }
+// SECURITY: Restrict CORS to localhost UI origins to prevent drive-by attacks
+// from malicious websites. MCP server endpoints can execute arbitrary commands,
+// so allowing any origin would enable RCE from any website visited while Automaker runs.
+const DEFAULT_CORS_ORIGINS = ['http://localhost:3007', 'http://127.0.0.1:3007'];
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: process.env.CORS_ORIGIN || DEFAULT_CORS_ORIGINS,
     credentials: true,
   })
 );
@@ -112,6 +118,7 @@ const agentService = new AgentService(DATA_DIR, events, settingsService);
 const featureLoader = new FeatureLoader();
 const autoModeService = new AutoModeService(events, settingsService);
 const claudeUsageService = new ClaudeUsageService();
+const mcpTestService = new MCPTestService(settingsService);
 
 // Initialize services
 (async () => {
@@ -157,6 +164,7 @@ app.use('/api/context', createContextRoutes(settingsService));
 app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
 app.use('/api/bmad', createBmadRoutes(settingsService));
 app.use('/api/npm-security', createNpmSecurityRoutes(settingsService));
+app.use('/api/mcp', createMCPRoutes(mcpTestService));
 app.use('/api/pipeline', createPipelineRoutes(pipelineService));
 
 // Create HTTP server

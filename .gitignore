@@ -84,3 +84,7 @@ docker-compose.override.yml
 
 # Codex CLI
 .codex/
+
+# Lock files
+pnpm-lock.yaml
+yarn.lock

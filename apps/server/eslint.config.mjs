@@ -55,11 +55,7 @@ const eslintConfig = defineConfig([
       '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
-  globalIgnores([
-    'dist/**',
-    'node_modules/**',
-    'coverage/**',
-  ]),
+  globalIgnores(['dist/**', 'node_modules/**', 'coverage/**']),
 ]);
 
 export default eslintConfig;

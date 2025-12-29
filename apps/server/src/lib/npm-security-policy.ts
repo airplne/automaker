@@ -166,22 +166,6 @@ export async function enforcePolicy(
     auditEntry,
   };
 
-  // DEV MODE BYPASS - check first before any other logic
-  if (process.env.AUTOMAKER_DISABLE_NPM_SECURITY === 'true') {
-    logger.warn('[npm-security] ⚠️ FIREWALL DISABLED FOR DEVELOPMENT');
-    const auditEntry = {
-      timestamp: Date.now(),
-      eventType: 'command-allowed' as const,
-      command: classified,
-    };
-    callbacks.onAuditLog(auditEntry);
-    return {
-      allowed: true,
-      requiresApproval: false,
-      auditEntry,
-    };
-  }
-
   // If policy is 'allow', let everything through but still audit
   if (policy.dependencyInstallPolicy === 'allow') {
     const auditEntry = {

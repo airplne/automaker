@@ -216,9 +216,9 @@ If verification fails:
 - [ ] API endpoints working
 - [ ] Functional tests pass
 
-**Verified by:** ********\_********
-**Date:** ********\_********
-**Commit:** ********\_********
+**Verified by:** **\*\*\*\***\_**\*\*\*\***
+**Date:** **\*\*\*\***\_**\*\*\*\***
+**Commit:** **\*\*\*\***\_**\*\*\*\***
 
 ---
 

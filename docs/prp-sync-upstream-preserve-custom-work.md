@@ -17,13 +17,29 @@
 - Custom work implemented:
   1. BMAD Executive Suite (7 agents)
   2. Wizard Planning Mode
-  3. npm-security guardrails (enabled by default; dev bypass available)
+  3. npm-security guardrails (currently **disabled by default** in code)
   4. Multiple bug fixes
 - Fork has custom commits on `main` (verify via `git log --oneline -10`)
 
 **Goal:** Pull latest changes from official AutoMaker repo while preserving ALL custom work.
 
 **Risk:** High - merge conflicts expected between our custom BMAD work and upstream changes.
+
+---
+
+## Prerequisite: Firewall State (MUST MATCH PR INTENT)
+
+This upstream sync is intended to land on a branch where npm-security is **disabled by default** (development posture).
+
+**Verify before merging upstream:**
+
+```bash
+# Defaults should be permissive
+rg -n "DEFAULT_NPM_SECURITY_SETTINGS" libs/types/src/npm-security.ts
+
+# Policy engine should early-return allow (firewall disabled)
+rg -n "Firewall intentionally disabled" apps/server/src/lib/npm-security-policy.ts
+```
 
 ---
 
@@ -155,15 +171,15 @@ apps/ui/src/components/views/settings-view/feature-defaults/feature-defaults-sec
 apps/server/tests/unit/services/auto-mode-wizard.test.ts
 ```
 
-### npm-security Guardrails (Enabled + Dev Bypass)
+### npm-security Guardrails (Disabled by Default)
 
 **Files that MUST be preserved:**
 
 ```
-libs/types/src/npm-security.ts (DEFAULT_NPM_SECURITY_SETTINGS strict defaults)
+libs/types/src/npm-security.ts (DEFAULT_NPM_SECURITY_SETTINGS allow defaults)
 apps/server/src/lib/npm-command-classifier.ts (command classification)
-apps/server/src/lib/npm-security-policy.ts (policy engine + AUTOMAKER_DISABLE_NPM_SECURITY bypass)
-apps/server/src/services/terminal-service.ts (secure npm env + bypass)
+apps/server/src/lib/npm-security-policy.ts (policy engine; firewall disabled by default)
+apps/server/src/services/terminal-service.ts (npm-security integration points)
 apps/server/src/providers/claude-provider.ts (beforeBashExecution hook)
 apps/server/src/routes/npm-security/index.ts (POST routes using projectPath in body)
 apps/server/src/routes/npm-security/routes/settings.ts (req.body projectPath handling)
@@ -351,7 +367,7 @@ Integrated latest official AutoMaker changes while preserving custom work:
 Custom Features Preserved:
 - BMAD Executive Suite (7 agents: Theo, Sage, Finn, Cerberus, Mary, Walt, Axel)
 - Wizard Planning Mode (interactive Q&A workflow)
-- npm-security guardrails (dev bypass via AUTOMAKER_DISABLE_NPM_SECURITY=true)
+- npm-security guardrails (firewall disabled by default for development)
 - UI bug fixes (state hydration, Play icon)
 
 Upstream Changes Integrated:
@@ -467,7 +483,7 @@ git reset --hard "$PRE_MERGE_SHA"
 - [ ] Upstream changes integrated
 - [ ] BMAD Executive Suite still functional (7 agents visible)
 - [ ] Wizard mode still functional (selector + modal work)
-- [ ] npm-security guardrails still functional (dev bypass still available)
+- [ ] npm-security guardrails still present (firewall remains disabled by default)
 - [ ] Bug fixes preserved
 - [ ] Build passes
 - [ ] No critical test regressions

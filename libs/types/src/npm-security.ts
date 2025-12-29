@@ -170,7 +170,7 @@ export interface NpmSecurityAuditEntry {
 /**
  * Default npm security settings used when no project-specific config exists
  *
- * Uses strict mode with lifecycle scripts blocked to maximize security by default.
+ * Firewall is currently disabled in this repo by default (allow installs + scripts).
  */
 export const DEFAULT_NPM_SECURITY_SETTINGS: NpmSecuritySettings = {
   // NPM security firewall is intentionally DISABLED in this repo by default.

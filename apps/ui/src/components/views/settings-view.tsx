@@ -20,6 +20,7 @@ import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/key
 import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature-defaults-section';
 import { DangerZoneSection } from './settings-view/danger-zone/danger-zone-section';
 import { NpmSecuritySettings } from './settings-view/npm-security';
+import { MCPServersSection } from './settings-view/mcp-servers';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
 import type { Project as ElectronProject } from '@/lib/electron';
 
@@ -120,6 +121,8 @@ export function SettingsView() {
         );
       case 'bmad':
         return <BmadSection projectPath={currentProject?.path ?? null} />;
+      case 'mcp-servers':
+        return <MCPServersSection />;
       case 'ai-enhancement':
         return <AIEnhancementSection />;
       case 'appearance':

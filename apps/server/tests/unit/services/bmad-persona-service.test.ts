@@ -7,7 +7,7 @@ import path from 'path';
 vi.mock('@automaker/bmad-bundle', () => ({
   getBmadAgentManifestPath: vi.fn(() => '/mock/path/agents.csv'),
   getBmadBundleDir: vi.fn(() => '/mock/bmad/bundle'),
-  BMAD_BUNDLE_VERSION: '6.0.0-alpha.21',
+  BMAD_BUNDLE_VERSION: '6.0.0-alpha.23',
 }));
 
 // Mock fs/promises
@@ -33,7 +33,7 @@ describe('bmad-persona-service.ts', () => {
 
   describe('getBundleVersion', () => {
     it('should return the BMAD bundle version', () => {
-      expect(service.getBundleVersion()).toBe('6.0.0-alpha.21');
+      expect(service.getBundleVersion()).toBe('6.0.0-alpha.23');
     });
   });
 
@@ -281,18 +281,18 @@ tea,Alex,Test Engineer,🧪,Role,Identity,Style,Principles,bmm,/path`;
       expect(tea!.thinkingBudget).toBe(8000);
     });
 
-    it('should return correct defaults for triad personas', async () => {
+    it('should return correct defaults for executive personas', async () => {
       const mockCsv = `name,displayName,title,icon,role,identity,communicationStyle,principles,module,path
-technologist-architect,Theo,Technologist-Architect,🔧,Tech lead,Triad persona,Technical,Quality-driven,bmm-triad,/path
-strategist-marketer,Sage,Strategist-Marketer,📊,Strategy lead,Triad persona,Strategic,Data-driven,bmm-triad,/path
-fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Triad persona,Process-oriented,User-focused,bmm-triad,/path`;
+technologist-architect,Theo,Technologist-Architect,🔧,Tech lead,Executive persona,Technical,Quality-driven,bmm-executive,/path
+strategist-marketer,Sage,Strategist-Marketer,📊,Strategy lead,Executive persona,Strategic,Data-driven,bmm-executive,/path
+fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Executive persona,Process-oriented,User-focused,bmm-executive,/path`;
       vi.mocked(fs.readFile).mockResolvedValue(mockCsv);
 
       const techArch = await service.resolvePersona({ personaId: 'bmad:technologist-architect' });
       const stratMkt = await service.resolvePersona({ personaId: 'bmad:strategist-marketer' });
       const fulfMgr = await service.resolvePersona({ personaId: 'bmad:fulfillization-manager' });
 
-      // Triad personas have specific defaults based on their roles
+      // Executive personas have specific defaults based on their roles
       expect(techArch!.model).toBe('sonnet');
       expect(techArch!.thinkingBudget).toBe(12000); // Architect-level thinking
       expect(stratMkt!.model).toBe('sonnet');
@@ -300,18 +300,45 @@ fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Triad pers
       expect(fulfMgr!.model).toBe('sonnet');
       expect(fulfMgr!.thinkingBudget).toBe(9000); // Balanced delivery thinking
     });
+
+    it('should return correct defaults for executive suite agents', async () => {
+      const mockCsv = `name,displayName,title,icon,role,identity,communicationStyle,principles,module,path
+security-guardian,Cerberus,Security Guardian,🛡️,Security Architect,Security expert,Vigilant,Security principles,bmm-executive,/path
+analyst-strategist,Mary,Chief Analyst,📊,Chief Analyst,Analysis expert,Analytical,Analysis principles,bmm-executive,/path
+financial-strategist,Walt,Financial Strategist,💰,Financial Strategist,Finance expert,Precise,Financial principles,bmm-executive,/path
+operations-commander,Axel,Operations Commander,⚙️,Operations Commander,Ops expert,Systematic,Ops principles,bmm-executive,/path`;
+      vi.mocked(fs.readFile).mockResolvedValue(mockCsv);
+
+      const securityGuardian = await service.resolvePersona({
+        personaId: 'bmad:security-guardian',
+      });
+      const analystStrategist = await service.resolvePersona({
+        personaId: 'bmad:analyst-strategist',
+      });
+      const financialStrategist = await service.resolvePersona({
+        personaId: 'bmad:financial-strategist',
+      });
+      const operationsCommander = await service.resolvePersona({
+        personaId: 'bmad:operations-commander',
+      });
+
+      expect(securityGuardian!.thinkingBudget).toBe(10000); // Strategic security role
+      expect(analystStrategist!.thinkingBudget).toBe(10000); // Analyst role
+      expect(financialStrategist!.thinkingBudget).toBe(10000); // Strategic role
+      expect(operationsCommander!.thinkingBudget).toBe(9000); // Operational role
+    });
   });
 
   describe('resolveAgentCollab', () => {
     beforeEach(() => {
-      // Mock manifest for agent collaboration tests (includes both legacy and triad personas)
+      // Mock manifest for agent collaboration tests (includes both legacy and executive personas)
       const mockCsv = `name,displayName,title,icon,role,identity,communicationStyle,principles,module,path
 pm,John,Product Manager,👔,Strategic planner,PM persona,Professional,User-focused,bmm,/path/to/pm.md
 architect,Winston,Software Architect,🏗️,System designer,Architect persona,Analytical,Best practices,bmm,/path/to/architect.md
 dev,Sarah,Developer,💻,Code implementer,Dev persona,Technical,Quality-driven,bmm,/path/to/dev.md
-technologist-architect,Theo,Technologist-Architect,🔧,Tech lead,Triad persona,Technical,Quality-driven,bmm-triad,/path/to/technologist-architect.md
-strategist-marketer,Sage,Strategist-Marketer,📊,Strategy lead,Triad persona,Strategic,Data-driven,bmm-triad,/path/to/strategist-marketer.md
-fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Triad persona,Process-oriented,User-focused,bmm-triad,/path/to/fulfillization-manager.md`;
+technologist-architect,Theo,Technologist-Architect,🔧,Tech lead,Executive persona,Technical,Quality-driven,bmm-executive,/path/to/technologist-architect.md
+strategist-marketer,Sage,Strategist-Marketer,📊,Strategy lead,Executive persona,Strategic,Data-driven,bmm-executive,/path/to/strategist-marketer.md
+fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Executive persona,Process-oriented,User-focused,bmm-executive,/path/to/fulfillization-manager.md`;
       vi.mocked(fs.readFile).mockResolvedValue(mockCsv);
     });
 
@@ -484,20 +511,28 @@ fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Triad pers
     });
   });
 
-  describe('triad persona integration', () => {
+  describe('executive persona integration', () => {
     beforeEach(() => {
-      // Mock manifest with triad personas
+      // Mock manifest with all 7 executive personas
       const mockCsv = `name,displayName,title,icon,role,identity,communicationStyle,principles,module,path
-technologist-architect,Theo,Technologist-Architect,🔧,Tech lead,Triad persona,Technical,Quality-driven,bmm-triad,/path/to/technologist-architect.md
-strategist-marketer,Sage,Strategist-Marketer,📊,Strategy lead,Triad persona,Strategic,Data-driven,bmm-triad,/path/to/strategist-marketer.md
-fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Triad persona,Process-oriented,User-focused,bmm-triad,/path/to/fulfillization-manager.md`;
+technologist-architect,Theo,Technologist-Architect,🔧,Tech lead,Executive persona,Technical,Quality-driven,bmm-executive,/path/to/technologist-architect.md
+strategist-marketer,Sage,Strategist-Marketer,📊,Strategy lead,Executive persona,Strategic,Data-driven,bmm-executive,/path/to/strategist-marketer.md
+fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Executive persona,Process-oriented,User-focused,bmm-executive,/path/to/fulfillization-manager.md
+security-guardian,Cerberus,Security Guardian,🛡️,Security Architect,Executive persona,Vigilant,Security principles,bmm-executive,/path/to/security-guardian.md
+analyst-strategist,Mary,Chief Analyst,📊,Chief Analyst,Executive persona,Analytical,Analysis principles,bmm-executive,/path/to/analyst-strategist.md
+financial-strategist,Walt,Financial Strategist,💰,Financial Strategist,Executive persona,Precise,Financial principles,bmm-executive,/path/to/financial-strategist.md
+operations-commander,Axel,Operations Commander,⚙️,Operations Commander,Executive persona,Systematic,Ops principles,bmm-executive,/path/to/operations-commander.md`;
       vi.mocked(fs.readFile).mockResolvedValue(mockCsv);
     });
 
-    it('should resolve triad personas correctly', async () => {
+    it('should resolve all 7 executive personas correctly', async () => {
       const techArch = await service.resolvePersona({ personaId: 'bmad:technologist-architect' });
       const stratMkt = await service.resolvePersona({ personaId: 'bmad:strategist-marketer' });
       const fulfMgr = await service.resolvePersona({ personaId: 'bmad:fulfillization-manager' });
+      const secGuard = await service.resolvePersona({ personaId: 'bmad:security-guardian' });
+      const analStrat = await service.resolvePersona({ personaId: 'bmad:analyst-strategist' });
+      const finStrat = await service.resolvePersona({ personaId: 'bmad:financial-strategist' });
+      const opsCmd = await service.resolvePersona({ personaId: 'bmad:operations-commander' });
 
       expect(techArch).not.toBeNull();
       expect(techArch!.systemPrompt).toContain('Theo');
@@ -510,39 +545,74 @@ fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Triad pers
       expect(fulfMgr).not.toBeNull();
       expect(fulfMgr!.systemPrompt).toContain('Finn');
       expect(fulfMgr!.systemPrompt).toContain('Fulfillization-Manager');
+
+      expect(secGuard).not.toBeNull();
+      expect(secGuard!.systemPrompt).toContain('Cerberus');
+      expect(secGuard!.systemPrompt).toContain('Security Guardian');
+
+      expect(analStrat).not.toBeNull();
+      expect(analStrat!.systemPrompt).toContain('Mary');
+      expect(analStrat!.systemPrompt).toContain('Chief Analyst');
+
+      expect(finStrat).not.toBeNull();
+      expect(finStrat!.systemPrompt).toContain('Walt');
+      expect(finStrat!.systemPrompt).toContain('Financial Strategist');
+
+      expect(opsCmd).not.toBeNull();
+      expect(opsCmd!.systemPrompt).toContain('Axel');
+      expect(opsCmd!.systemPrompt).toContain('Operations Commander');
     });
 
-    it('should support triad personas in agent collaboration', async () => {
+    it('should support all 7 executive personas in agent collaboration', async () => {
       const result = await service.resolveAgentCollab({
         agentIds: [
           'bmad:strategist-marketer',
           'bmad:technologist-architect',
           'bmad:fulfillization-manager',
+          'bmad:security-guardian',
+          'bmad:analyst-strategist',
+          'bmad:financial-strategist',
+          'bmad:operations-commander',
         ],
       });
 
       expect(result).not.toBeNull();
-      expect(result!.agents).toHaveLength(3);
+      expect(result!.agents).toHaveLength(7);
       expect(result!.agents[0].id).toBe('bmad:strategist-marketer');
       expect(result!.agents[0].name).toBe('Sage');
       expect(result!.agents[1].id).toBe('bmad:technologist-architect');
       expect(result!.agents[1].name).toBe('Theo');
       expect(result!.agents[2].id).toBe('bmad:fulfillization-manager');
       expect(result!.agents[2].name).toBe('Finn');
+      expect(result!.agents[3].id).toBe('bmad:security-guardian');
+      expect(result!.agents[3].name).toBe('Cerberus');
+      expect(result!.agents[4].id).toBe('bmad:analyst-strategist');
+      expect(result!.agents[4].name).toBe('Mary');
+      expect(result!.agents[5].id).toBe('bmad:financial-strategist');
+      expect(result!.agents[5].name).toBe('Walt');
+      expect(result!.agents[6].id).toBe('bmad:operations-commander');
+      expect(result!.agents[6].name).toBe('Axel');
       expect(result!.combinedSystemPrompt).toContain('Multi-Agent Collaboration Mode');
     });
 
-    it('should list triad personas in listPersonas', async () => {
+    it('should list all 7 executive personas in listPersonas', async () => {
       const personas = await service.listPersonas();
 
-      expect(personas.length).toBe(4); // party-synthesis + 3 triad
+      expect(personas.length).toBe(8); // party-synthesis + 7 executive
       expect(personas[0].id).toBe('bmad:party-synthesis');
-      expect(personas[1].id).toBe('bmad:technologist-architect');
-      expect(personas[2].id).toBe('bmad:strategist-marketer');
-      expect(personas[3].id).toBe('bmad:fulfillization-manager');
+
+      // Verify all 7 executive agents are present (order may vary after party-synthesis)
+      const executiveIds = personas.slice(1).map((p) => p.id);
+      expect(executiveIds).toContain('bmad:technologist-architect');
+      expect(executiveIds).toContain('bmad:strategist-marketer');
+      expect(executiveIds).toContain('bmad:fulfillization-manager');
+      expect(executiveIds).toContain('bmad:security-guardian');
+      expect(executiveIds).toContain('bmad:analyst-strategist');
+      expect(executiveIds).toContain('bmad:financial-strategist');
+      expect(executiveIds).toContain('bmad:operations-commander');
     });
 
-    it('should support single triad persona in agent collaboration', async () => {
+    it('should support single executive persona in agent collaboration', async () => {
       const result = await service.resolveAgentCollab({
         agentIds: ['bmad:technologist-architect'],
       });

@@ -9,7 +9,7 @@ import type { PersonaDescriptor, ResolvedPersona, ResolvedAgentCollab } from '@a
 
 /**
  * Public-facing persona IDs exposed in the UI.
- * Only the triad personas plus party-synthesis are shown to users.
+ * Only the executive personas plus party-synthesis are shown to users.
  * Other personas remain resolvable for backward compatibility with saved Feature cards.
  */
 const PUBLIC_PERSONA_IDS = [
@@ -17,6 +17,10 @@ const PUBLIC_PERSONA_IDS = [
   'bmad:strategist-marketer',
   'bmad:technologist-architect',
   'bmad:fulfillization-manager',
+  'bmad:security-guardian',
+  'bmad:analyst-strategist',
+  'bmad:financial-strategist',
+  'bmad:operations-commander',
 ] as const;
 
 type AgentManifestRow = {
@@ -123,7 +127,7 @@ export class BmadPersonaService {
       id: 'bmad:party-synthesis',
       label: 'Party Mode Synthesis (one-shot)',
       description:
-        'Simulates triad deliberation (Sage, Theo, Finn) and outputs a single synthesized recommendation',
+        'Simulates executive deliberation (Sage, Theo, Finn, and others) and outputs a single synthesized recommendation',
       icon: '🎉',
       module: 'core',
       sourcePath: path.join(getBmadBundleDir(), 'core', 'workflows', 'party-mode', 'workflow.md'),
@@ -146,10 +150,14 @@ export class BmadPersonaService {
       return {
         systemPrompt: [
           `You are running "Party Mode Synthesis" inside AutoMaker.`,
-          `Simulate a short internal deliberation between the 3 triad personas:`,
+          `Simulate a short internal deliberation between the 7 executive personas:`,
           `- Sage (strategist-marketer): Business WHY/WHO, product strategy, requirements`,
           `- Theo (technologist-architect): Technical HOW, architecture, implementation`,
           `- Finn (fulfillization-manager): SHIP + UX/docs/ops + end-user experience`,
+          `- Cerberus (security-guardian): Security posture, risk assessment, supply chain`,
+          `- Mary (analyst-strategist): Research, analysis, requirements elicitation`,
+          `- Walt (financial-strategist): Financial planning, ROI, resource allocation`,
+          `- Axel (operations-commander): Operations, process optimization, delivery`,
           `Then output a single synthesized recommendation.`,
           `You MUST be concise, specific, and actionable.`,
           params.artifactsDir
@@ -350,10 +358,16 @@ When responding:
       'bmad:module-builder': { model: 'sonnet', thinkingBudget: 8000 },
       'bmad:workflow-builder': { model: 'sonnet', thinkingBudget: 8000 },
 
-      // Triad personas - BMM framework roles
+      // Executive personas - BMM framework roles
       'bmad:strategist-marketer': { model: 'sonnet', thinkingBudget: 10000 },
       'bmad:technologist-architect': { model: 'sonnet', thinkingBudget: 12000 },
       'bmad:fulfillization-manager': { model: 'sonnet', thinkingBudget: 9000 },
+
+      // Executive Suite - new agents
+      'bmad:security-guardian': { model: 'sonnet', thinkingBudget: 10000 },
+      'bmad:analyst-strategist': { model: 'sonnet', thinkingBudget: 10000 },
+      'bmad:financial-strategist': { model: 'sonnet', thinkingBudget: 10000 },
+      'bmad:operations-commander': { model: 'sonnet', thinkingBudget: 9000 },
     };
 
     return defaults[personaId] || { model: 'sonnet', thinkingBudget: 8000 };

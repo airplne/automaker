@@ -73,6 +73,40 @@ export type ThinkingLevel = 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
 export type ModelProvider = 'claude' | 'cursor';
 
 /**
+ * PhaseModelConfig - Configuration for AI models used in different application phases
+ *
+ * Allows users to choose which model (Claude or Cursor) to use for each distinct
+ * operation in the application. This provides fine-grained control over cost,
+ * speed, and quality tradeoffs.
+ */
+export interface PhaseModelConfig {
+  // Quick tasks - recommend fast/cheap models (Haiku, Cursor auto)
+  /** Model for enhancing feature names and descriptions */
+  enhancementModel: AgentModel | CursorModelId;
+  /** Model for generating file context descriptions */
+  fileDescriptionModel: AgentModel | CursorModelId;
+  /** Model for analyzing and describing context images */
+  imageDescriptionModel: AgentModel | CursorModelId;
+
+  // Validation tasks - recommend smart models (Sonnet, Opus)
+  /** Model for validating and improving GitHub issues */
+  validationModel: AgentModel | CursorModelId;
+
+  // Generation tasks - recommend powerful models (Opus, Sonnet)
+  /** Model for generating full application specifications */
+  specGenerationModel: AgentModel | CursorModelId;
+  /** Model for creating features from specifications */
+  featureGenerationModel: AgentModel | CursorModelId;
+  /** Model for reorganizing and prioritizing backlog */
+  backlogPlanningModel: AgentModel | CursorModelId;
+  /** Model for analyzing project structure */
+  projectAnalysisModel: AgentModel | CursorModelId;
+}
+
+/** Keys of PhaseModelConfig for type-safe access */
+export type PhaseModelKey = keyof PhaseModelConfig;
+
+/**
  * WindowBounds - Electron window position and size for persistence
  *
  * Stored in global settings to restore window state across sessions.
@@ -298,10 +332,14 @@ export interface GlobalSettings {
   /** Mute completion notification sound */
   muteDoneSound: boolean;
 
-  // AI Model Selection
-  /** Which model to use for feature name/description enhancement */
+  // AI Model Selection (per-phase configuration)
+  /** Phase-specific AI model configuration */
+  phaseModels: PhaseModelConfig;
+
+  // Legacy AI Model Selection (deprecated - use phaseModels instead)
+  /** @deprecated Use phaseModels.enhancementModel instead */
   enhancementModel: AgentModel;
-  /** Which model to use for GitHub issue validation */
+  /** @deprecated Use phaseModels.validationModel instead */
   validationModel: AgentModel;
 
   // Cursor CLI Settings (global)
@@ -452,6 +490,23 @@ export interface ProjectSettings {
  * Default values and constants
  */
 
+/** Default phase model configuration - sensible defaults for each task type */
+export const DEFAULT_PHASE_MODELS: PhaseModelConfig = {
+  // Quick tasks - use fast models for speed and cost
+  enhancementModel: 'sonnet',
+  fileDescriptionModel: 'haiku',
+  imageDescriptionModel: 'haiku',
+
+  // Validation - use smart models for accuracy
+  validationModel: 'sonnet',
+
+  // Generation - use powerful models for quality
+  specGenerationModel: 'opus',
+  featureGenerationModel: 'sonnet',
+  backlogPlanningModel: 'sonnet',
+  projectAnalysisModel: 'sonnet',
+};
+
 /** Default keyboard shortcut bindings */
 export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   board: 'K',
@@ -492,6 +547,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultRequirePlanApproval: false,
   defaultAIProfileId: null,
   muteDoneSound: false,
+  phaseModels: DEFAULT_PHASE_MODELS,
   enhancementModel: 'sonnet',
   validationModel: 'opus',
   enabledCursorModels: getAllCursorModelIds(),

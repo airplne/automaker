@@ -52,6 +52,8 @@ export type {
   PlanningMode,
   ThinkingLevel,
   ModelProvider,
+  PhaseModelConfig,
+  PhaseModelKey,
   KeyboardShortcuts,
   AIProfile,
   ProjectRef,
@@ -65,6 +67,7 @@ export type {
 } from './settings.js';
 export {
   DEFAULT_KEYBOARD_SHORTCUTS,
+  DEFAULT_PHASE_MODELS,
   DEFAULT_GLOBAL_SETTINGS,
   DEFAULT_CREDENTIALS,
   DEFAULT_PROJECT_SETTINGS,

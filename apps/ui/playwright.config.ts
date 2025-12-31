@@ -11,15 +11,17 @@ export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: undefined,
+  retries: 0,
+  workers: 1, // Run sequentially to avoid auth conflicts with shared server
   reporter: 'html',
   timeout: 30000,
   use: {
     baseURL: `http://localhost:${port}`,
-    trace: 'on-first-retry',
+    trace: 'on-failure',
     screenshot: 'only-on-failure',
   },
+  // Global setup - authenticate before each test
+  globalSetup: require.resolve('./tests/global-setup.ts'),
   projects: [
     {
       name: 'chromium',
@@ -41,6 +43,10 @@ export default defineConfig({
               PORT: String(serverPort),
               // Enable mock agent in CI to avoid real API calls
               AUTOMAKER_MOCK_AGENT: mockAgent ? 'true' : 'false',
+              // Set a test API key for web mode authentication
+              AUTOMAKER_API_KEY: process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests',
+              // Hide the API key banner to reduce log noise
+              AUTOMAKER_HIDE_API_KEY: 'true',
               // No ALLOWED_ROOT_DIRECTORY restriction - allow all paths for testing
             },
           },
@@ -53,7 +59,7 @@ export default defineConfig({
             env: {
               ...process.env,
               VITE_SKIP_SETUP: 'true',
-              // Skip electron plugin during dev (build always includes electron outputs)
+              // Always skip electron plugin during tests - prevents duplicate server spawning
               VITE_SKIP_ELECTRON: 'true',
             },
           },

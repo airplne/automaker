@@ -5,6 +5,7 @@ export type SettingsViewId =
   | 'claude'
   | 'bmad'
   | 'mcp-servers'
+  | 'prompts'
   | 'ai-enhancement'
   | 'appearance'
   | 'terminal'

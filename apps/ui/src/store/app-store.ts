@@ -15,6 +15,7 @@ import type {
   FeatureStatusWithPipeline,
   PipelineConfig,
   PipelineStep,
+  PromptCustomization,
 } from '@automaker/types';
 
 // Re-export shared types for convenience
@@ -476,6 +477,9 @@ export interface AppState {
   mcpAutoApproveTools: boolean; // Auto-approve MCP tool calls without permission prompts
   mcpUnrestrictedTools: boolean; // Allow unrestricted tools when MCP servers are enabled
 
+  // Prompt Customization
+  promptCustomization: PromptCustomization; // Custom prompts for Auto Mode, Agent, Backlog Plan, Enhancement
+
   // Project Analysis
   projectAnalysis: ProjectAnalysis | null;
   isAnalyzing: boolean;
@@ -781,6 +785,9 @@ export interface AppActions {
   setEnableSandboxMode: (enabled: boolean) => Promise<void>;
   setMcpAutoApproveTools: (enabled: boolean) => Promise<void>;
   setMcpUnrestrictedTools: (enabled: boolean) => Promise<void>;
+
+  // Prompt Customization actions
+  setPromptCustomization: (customization: PromptCustomization) => Promise<void>;
 
   // AI Profile actions
   addAIProfile: (profile: Omit<AIProfile, 'id'>) => void;
@@ -1126,6 +1133,7 @@ const initialState: AppState = {
   mcpServers: [], // No MCP servers configured by default
   mcpAutoApproveTools: true, // Default to enabled - bypass permission prompts for MCP tools
   mcpUnrestrictedTools: true, // Default to enabled - don't filter allowedTools when MCP enabled
+  promptCustomization: {}, // Empty by default - all prompts use built-in defaults
   aiProfiles: DEFAULT_AI_PROFILES,
   projectAnalysis: null,
   isAnalyzing: false,
@@ -1778,6 +1786,14 @@ export const useAppStore = create<AppState & AppActions>()(
       },
       setMcpUnrestrictedTools: async (enabled) => {
         set({ mcpUnrestrictedTools: enabled });
+        // Sync to server settings file
+        const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+        await syncSettingsToServer();
+      },
+
+      // Prompt Customization actions
+      setPromptCustomization: async (customization) => {
+        set({ promptCustomization: customization });
         // Sync to server settings file
         const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
         await syncSettingsToServer();
@@ -3154,6 +3170,8 @@ export const useAppStore = create<AppState & AppActions>()(
           mcpServers: state.mcpServers,
           mcpAutoApproveTools: state.mcpAutoApproveTools,
           mcpUnrestrictedTools: state.mcpUnrestrictedTools,
+          // Prompt customization
+          promptCustomization: state.promptCustomization,
           // Profiles and sessions
           aiProfiles: state.aiProfiles,
           chatSessions: state.chatSessions,

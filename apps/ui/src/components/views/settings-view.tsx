@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAppStore } from '@/store/app-store';
+import { useSetupStore } from '@/store/setup-store';
 
 import { useCliStatus, useSettingsView } from './settings-view/hooks';
 import { NAV_ITEMS } from './settings-view/config/navigation';
@@ -21,6 +22,7 @@ import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature
 import { DangerZoneSection } from './settings-view/danger-zone/danger-zone-section';
 import { NpmSecuritySettings } from './settings-view/npm-security';
 import { MCPServersSection } from './settings-view/mcp-servers';
+import { PromptCustomizationSection } from './settings-view/prompts';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
 import type { Project as ElectronProject } from '@/lib/electron';
 
@@ -55,13 +57,22 @@ export function SettingsView() {
     setAutoLoadClaudeMd,
     enableSandboxMode,
     setEnableSandboxMode,
+    promptCustomization,
+    setPromptCustomization,
   } = useAppStore();
 
+  const claudeAuthStatus = useSetupStore((state) => state.claudeAuthStatus);
+
   // Hide usage tracking when using API key (only show for Claude Code CLI users)
+  // Check both user-entered API key and environment variable ANTHROPIC_API_KEY
   // Also hide on Windows for now (CLI usage command not supported)
+  // Only show if CLI has been verified/authenticated
   const isWindows =
     typeof navigator !== 'undefined' && navigator.platform?.toLowerCase().includes('win');
-  const showUsageTracking = !apiKeys.anthropic && !isWindows;
+  const hasApiKey = !!apiKeys.anthropic || !!claudeAuthStatus?.hasEnvApiKey;
+  const isCliVerified =
+    claudeAuthStatus?.authenticated && claudeAuthStatus?.method === 'cli_authenticated';
+  const showUsageTracking = !hasApiKey && !isWindows && isCliVerified;
 
   // Convert electron Project to settings-view Project type
   const convertProject = (project: ElectronProject | null): SettingsProject | null => {
@@ -123,6 +134,13 @@ export function SettingsView() {
         return <BmadSection projectPath={currentProject?.path ?? null} />;
       case 'mcp-servers':
         return <MCPServersSection />;
+      case 'prompts':
+        return (
+          <PromptCustomizationSection
+            promptCustomization={promptCustomization}
+            onPromptCustomizationChange={setPromptCustomization}
+          />
+        );
       case 'ai-enhancement':
         return <AIEnhancementSection />;
       case 'appearance':

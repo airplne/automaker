@@ -547,6 +547,7 @@ export interface ElectronAPI {
   /** Present in Electron builds via preload; used for UI indicators only */
   isElectron?: boolean;
   ping: () => Promise<string>;
+  getApiKey?: () => Promise<string | null>;
   openExternalLink: (url: string) => Promise<{ success: boolean; error?: string }>;
 
   // Dialog APIs

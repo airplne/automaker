@@ -9,6 +9,7 @@
 import type { AgentModel } from './model.js';
 import type { NpmSecuritySettings } from './npm-security.js';
 import { DEFAULT_NPM_SECURITY_SETTINGS } from './npm-security.js';
+import type { PromptCustomization } from './prompts.js';
 
 // Re-export AgentModel and NpmSecuritySettings for convenience
 export type { AgentModel, NpmSecuritySettings };
@@ -369,6 +370,10 @@ export interface GlobalSettings {
   mcpAutoApproveTools?: boolean;
   /** Allow unrestricted tools when MCP servers are enabled (don't filter allowedTools) */
   mcpUnrestrictedTools?: boolean;
+
+  // Prompt Customization
+  /** Custom prompts for Auto Mode, Agent Runner, Backlog Planning, and Enhancements */
+  promptCustomization?: PromptCustomization;
 }
 
 /**

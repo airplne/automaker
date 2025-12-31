@@ -82,4 +82,40 @@ test.describe('Feature Backlog', () => {
       expect(await featureCard.count()).toBeGreaterThan(0);
     }).toPass({ timeout: 10000 });
   });
+
+  test.describe('Enhance with AI', () => {
+    test('should enhance description with AI in mock mode', async ({ page }) => {
+      // This test relies on AUTOMAKER_MOCK_AGENT=true being set
+      await setupRealProject(page, projectPath, projectName, { setAsCurrent: true });
+
+      await page.goto('/board');
+      await waitForNetworkIdle(page);
+
+      await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('[data-testid="kanban-column-backlog"]')).toBeVisible({
+        timeout: 5000,
+      });
+
+      // Open the add feature dialog
+      await clickAddFeature(page);
+
+      // Type a description
+      await page.locator('[data-testid="feature-description-input"]').fill('add dark mode');
+
+      // Click the Enhance with AI button
+      await page.getByRole('button', { name: /Enhance with AI/i }).click();
+
+      // Wait for enhancement to complete (mock mode should be fast)
+      await page.waitForTimeout(500); // Brief wait for mock response
+
+      // In mock mode, the description should be updated with enhancement markers
+      const description = await page
+        .locator('[data-testid="feature-description-input"]')
+        .inputValue();
+
+      // Mock mode returns text with [ENHANCED - ...] prefix
+      expect(description).toContain('[ENHANCED');
+      expect(description).toContain('add dark mode'); // Original text should be preserved
+    });
+  });
 });

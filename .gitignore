@@ -92,3 +92,4 @@ docker-compose.override.yml
 pnpm-lock.yaml
 yarn.lock
 .npm-cache/
+.mcp.json

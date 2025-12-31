@@ -280,6 +280,16 @@ export function createDescribeImageHandler(
         logger.info(`[${requestId}] Using actual path: ${actualPath}`);
       }
 
+      // Mock mode for CI/E2E testing - avoid calling Claude for vision
+      if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
+        const response: DescribeImageSuccessResponse = {
+          success: true,
+          description: `Mock image description for ${path.basename(actualPath)}`,
+        };
+        res.json(response);
+        return;
+      }
+
       // Log path + stats (this is often where issues start: missing file, perms, size)
       let stat: fs.Stats | null = null;
       try {

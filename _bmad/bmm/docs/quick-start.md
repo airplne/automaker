@@ -74,7 +74,7 @@ Based on your description, the workflow will suggest a track and let you choose 
 
 #### What gets created?
 
-Once you confirm your track, the `bmm-workflow-status.yaml` file will be created in your project's `_bmad-output/` folder (assuming default configuration). This file tracks your progress through all phases.
+Once you confirm your track, the `bmm-workflow-status.yaml` file will be created in your project's docs folder (assuming default install location). This file tracks your progress through all phases.
 
 **Important notes:**
 

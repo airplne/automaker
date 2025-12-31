@@ -140,6 +140,25 @@ export function createEnhanceHandler(): (req: Request, res: Response) => Promise
 
       logger.debug(`Using model: ${resolvedModel}`);
 
+      // Mock mode for CI testing - return deterministic response without calling Claude
+      if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
+        logger.info('Mock mode enabled - returning deterministic enhancement');
+
+        const mockResponses: Record<EnhancementMode, string> = {
+          improve: `[ENHANCED - Improved Clarity]\n\n${trimmedText}\n\n**Key improvements:**\n- Clearer structure\n- More specific language\n- Better actionability`,
+          technical: `[ENHANCED - Technical Details]\n\n${trimmedText}\n\n**Technical considerations:**\n- Implementation approach defined\n- Edge cases identified\n- Performance considerations noted`,
+          simplify: `[ENHANCED - Simplified]\n\n${trimmedText}\n\n**Simplified version:**\n- Core requirement distilled\n- Unnecessary complexity removed`,
+          acceptance: `[ENHANCED - Acceptance Criteria]\n\n${trimmedText}\n\n**Acceptance Criteria:**\n- [ ] Feature works as described\n- [ ] Edge cases handled\n- [ ] Tests pass`,
+        };
+
+        const response: EnhanceSuccessResponse = {
+          success: true,
+          enhancedText: mockResponses[validMode],
+        };
+        res.json(response);
+        return;
+      }
+
       // Call Claude SDK with minimal configuration for text transformation
       // Key: no tools, just text completion
       const stream = query({
@@ -177,9 +196,43 @@ export function createEnhanceHandler(): (req: Request, res: Response) => Promise
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       logger.error('Enhancement failed:', errorMessage);
 
+      // Detect common error patterns and provide actionable guidance
+      let userFriendlyError = errorMessage;
+      const lowerError = errorMessage.toLowerCase();
+
+      if (
+        lowerError.includes('api key') ||
+        lowerError.includes('authentication') ||
+        lowerError.includes('unauthorized') ||
+        lowerError.includes('401')
+      ) {
+        userFriendlyError =
+          'Claude not configured. Add an API key in Settings → API Keys, or ensure ANTHROPIC_API_KEY is set.';
+      } else if (
+        lowerError.includes('credit') ||
+        lowerError.includes('billing') ||
+        lowerError.includes('payment') ||
+        lowerError.includes('402')
+      ) {
+        userFriendlyError =
+          'Insufficient credits or billing issue. Please check your Anthropic account billing status.';
+      } else if (
+        lowerError.includes('rate limit') ||
+        lowerError.includes('too many requests') ||
+        lowerError.includes('429')
+      ) {
+        userFriendlyError = 'Rate limit reached. Please wait a moment and try again.';
+      } else if (
+        lowerError.includes('overloaded') ||
+        lowerError.includes('503') ||
+        lowerError.includes('service unavailable')
+      ) {
+        userFriendlyError = 'Claude is temporarily overloaded. Please try again in a few moments.';
+      }
+
       const response: EnhanceErrorResponse = {
         success: false,
-        error: errorMessage,
+        error: userFriendlyError,
       };
       res.status(500).json(response);
     }

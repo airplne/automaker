@@ -468,6 +468,7 @@ type,name,module,path,hash
 "md","operations-commander","bmm-executive","bmm-executive/agents/operations-commander.md","c3af6954f9d3c1546574183149ac4ef40208a778a9ec5f1fa4b4baf7d19b5fe0"
 "md","apex","bmm-executive","bmm-executive/agents/apex.md","79489c679e7821f8be8e12342abeee4f6e4aaded5e8a336c296e8ca6fdc7ddbd"
 "md","zen","bmm-executive","bmm-executive/agents/zen.md","09c8e45ec8a3e526a316633654ec12c63da9a8f538c1723ab02052dbd4c993a6"
+"md","echon","bmm-executive","bmm-executive/agents/echon.md","3a2a1b37fac5be97d765d0496aaf5a5ec327464e663b4f74ba7a53e5b2f1770f"
 "md","workflow","bmm-executive","bmm-executive/workflows/triad-discovery/workflow.md","f949fbdd855fed828a1ea037c03d62fc38c9b89861d1cdb61790f9d6136d17b8"
 "md","workflow","bmm-executive","bmm-executive/workflows/triad-build/workflow.md","95e174e8ea86e2656b6bf3603376a73b56df4e3ae27f98a34168013a0976f41e"
 "md","workflow","bmm-executive","bmm-executive/workflows/triad-ship/workflow.md","9312c33f3d9d4a9f3d2cc987ab4a2e63cf9cca8afb83c6d1e7f1366f44e7f4b0"

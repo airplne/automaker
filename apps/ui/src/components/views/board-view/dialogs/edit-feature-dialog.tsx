@@ -57,6 +57,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { DependencyTreeDialog } from './dependency-tree-dialog';
+import { MAX_EXECUTIVE_AGENTS, ALL_EXECUTIVE_AGENT_IDS } from '@/config/bmad-agents';
+import { buildEnhanceInput, loadReferencedFiles } from '@/lib/enhance-with-ai';
 
 const normalizeThinkingLevel = (value: unknown): ThinkingLevel => {
   if (
@@ -177,6 +179,7 @@ export function EditFeatureDialog({
 
   // Get enhancement model and worktrees setting from store
   const { enhancementModel, useWorktrees } = useAppStore();
+  const currentProject = useAppStore((state) => state.currentProject);
 
   const { personas: bmadPersonas, isLoading: isLoadingPersonas } = useBmadPersonas({
     enabled: !!feature,
@@ -211,7 +214,7 @@ export function EditFeatureDialog({
       const next = new Set(prev);
       if (next.has(agentId)) {
         next.delete(agentId);
-      } else if (next.size < 4) {
+      } else if (next.size < MAX_EXECUTIVE_AGENTS) {
         next.add(agentId);
       }
       return next;
@@ -303,8 +306,28 @@ export function EditFeatureDialog({
     setIsEnhancing(true);
     try {
       const api = getElectronAPI();
+
+      // Load @-referenced files if project path is available
+      const referencedFiles = currentProject?.path
+        ? await loadReferencedFiles(
+            editingFeature.description,
+            currentProject.path,
+            async (path) => {
+              const result = await api.readFile?.(path);
+              return result || { success: false };
+            }
+          )
+        : [];
+
+      // Build enhancement input with all context
+      const enhanceInput = buildEnhanceInput({
+        description: editingFeature.description,
+        attachedTextFiles: editingFeature.textFilePaths ?? [],
+        referencedFiles,
+      });
+
       const result = await api.enhancePrompt?.enhance(
-        editingFeature.description,
+        enhanceInput.originalText,
         enhancementMode,
         enhancementModel
       );
@@ -312,7 +335,17 @@ export function EditFeatureDialog({
       if (result?.success && result.enhancedText) {
         const enhancedText = result.enhancedText;
         setEditingFeature((prev) => (prev ? { ...prev, description: enhancedText } : prev));
-        toast.success('Description enhanced!');
+
+        // Show context info in success message
+        const contextParts: string[] = [];
+        if (enhanceInput.attachedFileCount > 0) {
+          contextParts.push(`${enhanceInput.attachedFileCount} attached file(s)`);
+        }
+        if (enhanceInput.referencedFileCount > 0) {
+          contextParts.push(`${enhanceInput.referencedFileCount} @reference(s)`);
+        }
+        const contextMsg = contextParts.length > 0 ? ` (with ${contextParts.join(', ')})` : '';
+        toast.success(`Description enhanced!${contextMsg}`);
       } else {
         toast.error(result?.error || 'Failed to enhance description');
       }
@@ -541,7 +574,7 @@ export function EditFeatureDialog({
                   <Users className="w-4 h-4 text-muted-foreground" />
                   <Label>Add BMAD Agents to Task</Label>
                   <span className="text-xs text-muted-foreground">
-                    ({selectedAgentIds.size}/4 max)
+                    ({selectedAgentIds.size}/{MAX_EXECUTIVE_AGENTS} max)
                   </span>
                 </div>
                 {selectedAgentIds.size > 0 && (
@@ -570,22 +603,14 @@ export function EditFeatureDialog({
                   <div className="text-xs font-medium text-muted-foreground px-2 py-1">
                     BMM Executive Agents
                   </div>
-                  {[
-                    'bmad:strategist-marketer',
-                    'bmad:technologist-architect',
-                    'bmad:fulfillization-manager',
-                    'bmad:security-guardian',
-                    'bmad:analyst-strategist',
-                    'bmad:financial-strategist',
-                    'bmad:operations-commander',
-                    'bmad:apex',
-                    'bmad:zen',
-                  ]
-                    .map((id) => bmadPersonas.find((persona) => persona.id === id))
+                  {ALL_EXECUTIVE_AGENT_IDS.map((id) =>
+                    bmadPersonas.find((persona) => persona.id === id)
+                  )
                     .filter((agent): agent is NonNullable<typeof agent> => agent !== undefined)
                     .map((agent) => {
                       const isSelected = selectedAgentIds.has(agent.id);
-                      const isDisabled = !isSelected && selectedAgentIds.size >= 4;
+                      const isDisabled =
+                        !isSelected && selectedAgentIds.size >= MAX_EXECUTIVE_AGENTS;
                       const selectionOrder = isSelected
                         ? Array.from(selectedAgentIds).indexOf(agent.id) + 1
                         : null;

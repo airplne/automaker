@@ -66,6 +66,8 @@ import {
   formatAncestorContextForPrompt,
   type AncestorContext,
 } from '@automaker/dependency-resolver';
+import { ALL_EXECUTIVE_AGENT_IDS, MAX_EXECUTIVE_AGENTS } from '@/config/bmad-agents';
+import { buildEnhanceInput, loadReferencedFiles } from '@/lib/enhance-with-ai';
 
 type FeatureData = {
   title: string;
@@ -185,6 +187,7 @@ export function AddFeatureDialog({
     defaultRequirePlanApproval,
     defaultAIProfileId,
     useWorktrees,
+    currentProject,
   } = useAppStore();
 
   // Sync defaults when dialog opens
@@ -210,19 +213,7 @@ export function AddFeatureDialog({
       setRequirePlanApproval(defaultRequirePlanApproval);
       // Initialize Party Mode with all executive agents selected by default
       setUsePartyMode(true);
-      setSelectedAgentIds(
-        new Set([
-          'bmad:strategist-marketer',
-          'bmad:technologist-architect',
-          'bmad:fulfillization-manager',
-          'bmad:security-guardian',
-          'bmad:analyst-strategist',
-          'bmad:financial-strategist',
-          'bmad:operations-commander',
-          'bmad:apex',
-          'bmad:zen',
-        ])
-      );
+      setSelectedAgentIds(new Set(ALL_EXECUTIVE_AGENT_IDS));
 
       // Initialize ancestors for spawn mode
       if (parentFeature) {
@@ -375,8 +366,24 @@ export function AddFeatureDialog({
     setIsEnhancing(true);
     try {
       const api = getElectronAPI();
+
+      // Load @-referenced files if project path is available
+      const referencedFiles = currentProject?.path
+        ? await loadReferencedFiles(newFeature.description, currentProject.path, async (path) => {
+            const result = await api.readFile?.(path);
+            return result || { success: false };
+          })
+        : [];
+
+      // Build enhancement input with all context
+      const enhanceInput = buildEnhanceInput({
+        description: newFeature.description,
+        attachedTextFiles: newFeature.textFilePaths,
+        referencedFiles,
+      });
+
       const result = await api.enhancePrompt?.enhance(
-        newFeature.description,
+        enhanceInput.originalText,
         enhancementMode,
         enhancementModel
       );
@@ -384,7 +391,17 @@ export function AddFeatureDialog({
       if (result?.success && result.enhancedText) {
         const enhancedText = result.enhancedText;
         setNewFeature((prev) => ({ ...prev, description: enhancedText }));
-        toast.success('Description enhanced!');
+
+        // Show context info in success message
+        const contextParts: string[] = [];
+        if (enhanceInput.attachedFileCount > 0) {
+          contextParts.push(`${enhanceInput.attachedFileCount} attached file(s)`);
+        }
+        if (enhanceInput.referencedFileCount > 0) {
+          contextParts.push(`${enhanceInput.referencedFileCount} @reference(s)`);
+        }
+        const contextMsg = contextParts.length > 0 ? ` (with ${contextParts.join(', ')})` : '';
+        toast.success(`Description enhanced!${contextMsg}`);
       } else {
         toast.error(result?.error || 'Failed to enhance description');
       }
@@ -423,28 +440,13 @@ export function AddFeatureDialog({
   // BMAD personas are now selected on the Prompt tab, not via profiles
   const modelOnlyProfiles = useMemo(() => aiProfiles.filter((p) => !p.personaId), [aiProfiles]);
 
-  // All executive agent IDs for Party Mode
-  const allExecutiveAgentIds = [
-    'bmad:strategist-marketer',
-    'bmad:technologist-architect',
-    'bmad:fulfillization-manager',
-    'bmad:security-guardian',
-    'bmad:analyst-strategist',
-    'bmad:financial-strategist',
-    'bmad:operations-commander',
-    'bmad:apex',
-    'bmad:zen',
-  ];
-
-  const maxExecutiveAgents = allExecutiveAgentIds.length;
-
   // Multi-select agent toggle function
   const toggleAgentSelection = (agentId: string) => {
     setSelectedAgentIds((prev) => {
       const next = new Set(prev);
       if (next.has(agentId)) {
         next.delete(agentId);
-      } else if (next.size < maxExecutiveAgents) {
+      } else if (next.size < MAX_EXECUTIVE_AGENTS) {
         next.add(agentId);
       }
       return next;
@@ -455,7 +457,7 @@ export function AddFeatureDialog({
   const togglePartyMode = (enabled: boolean) => {
     setUsePartyMode(enabled);
     if (enabled) {
-      setSelectedAgentIds(new Set(allExecutiveAgentIds));
+      setSelectedAgentIds(new Set(ALL_EXECUTIVE_AGENT_IDS));
     } else {
       setSelectedAgentIds(new Set());
     }
@@ -475,8 +477,9 @@ export function AddFeatureDialog({
 
   // Agent categories - Executive Suite agents only
   const agentCategories = useMemo(() => {
-    const executiveAgents = allExecutiveAgentIds
-      .map((agentId) => bmadPersonas.find((p) => p.id === agentId))
+    const executiveAgents = ALL_EXECUTIVE_AGENT_IDS.map((agentId) =>
+      bmadPersonas.find((p) => p.id === agentId)
+    )
       .filter((agent): agent is NonNullable<typeof agent> => agent !== undefined)
       .map((agent) => ({
         id: agent.id,
@@ -683,7 +686,7 @@ export function AddFeatureDialog({
                 <Label>Executive Agent Collaboration</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
-                    {selectedAgentIds.size}/{maxExecutiveAgents} selected
+                    {selectedAgentIds.size}/{MAX_EXECUTIVE_AGENTS} selected
                   </span>
                   {!usePartyMode && selectedAgentIds.size > 0 && (
                     <Button
@@ -761,7 +764,7 @@ export function AddFeatureDialog({
                     <div className="flex-1">
                       <span className="font-medium">Select Individual Agents</span>
                       <p className="text-xs text-muted-foreground">
-                        Choose specific agents (up to {maxExecutiveAgents})
+                        Choose specific agents (up to {MAX_EXECUTIVE_AGENTS})
                       </p>
                     </div>
                     <Checkbox
@@ -805,7 +808,7 @@ export function AddFeatureDialog({
                                 {category.agents.map((agent) => {
                                   const isSelected = selectedAgentIds.has(agent.id);
                                   const isDisabled =
-                                    !isSelected && selectedAgentIds.size >= maxExecutiveAgents;
+                                    !isSelected && selectedAgentIds.size >= MAX_EXECUTIVE_AGENTS;
                                   const selectedArray = Array.from(selectedAgentIds);
                                   const orderNumber = isSelected
                                     ? selectedArray.indexOf(agent.id) + 1
@@ -834,8 +837,8 @@ export function AddFeatureDialog({
 
               <p className="text-xs text-muted-foreground">
                 {usePartyMode
-                  ? `Party Mode: All ${maxExecutiveAgents} executive agents deliberate and synthesize a unified recommendation.`
-                  : `Select up to ${maxExecutiveAgents} executive agents for collaborative execution.`}
+                  ? `Party Mode: All ${MAX_EXECUTIVE_AGENTS} executive agents deliberate and synthesize a unified recommendation.`
+                  : `Select up to ${MAX_EXECUTIVE_AGENTS} executive agents for collaborative execution.`}
               </p>
             </div>
 

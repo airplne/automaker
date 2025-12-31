@@ -59,12 +59,12 @@ export function BoardHeader({
         scaffoldMethodology: false,
       });
       if (result?.success) {
-        toast.success('BMAD initialized');
+        toast.success('BMAD installed');
       } else {
-        toast.error('Failed to initialize BMAD', { description: result?.error || 'Unknown error' });
+        toast.error('Failed to install BMAD', { description: result?.error || 'Unknown error' });
       }
     } catch (e) {
-      toast.error('Failed to initialize BMAD', {
+      toast.error('Failed to install BMAD', {
         description: e instanceof Error ? e.message : 'Unknown error',
       });
     }
@@ -159,7 +159,7 @@ export function BoardHeader({
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem onClick={handleInitializeBmad} data-testid="bmad-initialize-quick">
               <Download className="w-4 h-4 mr-2" />
-              Initialize BMAD
+              Install BMAD
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleUpgradeBmad} data-testid="bmad-upgrade-quick">
               <ArrowUpCircle className="w-4 h-4 mr-2" />

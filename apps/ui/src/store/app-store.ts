@@ -996,7 +996,7 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     id: 'profile-bmad-finn',
     name: 'BMAD: Finn (Fulfillization-Manager)',
     description: 'Delivery + Experience + Operations Specialist. End-to-end execution and quality.',
-    model: 'sonnet',
+    model: 'opus',
     thinkingLevel: 'medium',
     provider: 'claude',
     isBuiltIn: true,
@@ -1007,7 +1007,7 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     id: 'profile-bmad-cerberus',
     name: 'BMAD: Cerberus (Security-Guardian)',
     description: 'Security Architect + Risk Guardian. Security posture and threat modeling.',
-    model: 'sonnet',
+    model: 'opus',
     thinkingLevel: 'high',
     provider: 'claude',
     isBuiltIn: true,
@@ -1018,7 +1018,7 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     id: 'profile-bmad-mary',
     name: 'BMAD: Mary (Analyst-Strategist)',
     description: 'Chief Analyst + Strategic Intelligence Expert. Research and requirements.',
-    model: 'sonnet',
+    model: 'opus',
     thinkingLevel: 'high',
     provider: 'claude',
     isBuiltIn: true,
@@ -1029,7 +1029,7 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     id: 'profile-bmad-walt',
     name: 'BMAD: Walt (Financial-Strategist)',
     description: 'Financial Strategist + Resource Allocator. Budgets and ROI analysis.',
-    model: 'sonnet',
+    model: 'opus',
     thinkingLevel: 'medium',
     provider: 'claude',
     isBuiltIn: true,
@@ -1040,7 +1040,7 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     id: 'profile-bmad-axel',
     name: 'BMAD: Axel (Operations-Commander)',
     description: 'Operations Commander + Process Optimizer. Efficiency and delivery.',
-    model: 'sonnet',
+    model: 'opus',
     thinkingLevel: 'medium',
     provider: 'claude',
     isBuiltIn: true,
@@ -1052,7 +1052,7 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     name: 'BMAD: Apex (Peak Performance Developer)',
     description:
       'Peak Performance Full-Stack Engineer. Performance optimization, rapid iteration, CI/CD.',
-    model: 'sonnet',
+    model: 'opus',
     thinkingLevel: 'medium',
     provider: 'claude',
     isBuiltIn: true,
@@ -1064,12 +1064,24 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     name: 'BMAD: Zen (Clean Architecture Developer)',
     description:
       'Clean Architecture Full-Stack Engineer. Maintainable code, refactoring, test strategy.',
-    model: 'sonnet',
+    model: 'opus',
     thinkingLevel: 'high',
     provider: 'claude',
     isBuiltIn: true,
     icon: 'Sparkles',
     personaId: 'bmad:zen',
+  },
+  {
+    id: 'profile-bmad-echon',
+    name: 'BMAD: Echon (Post-Launch Lifecycle)',
+    description:
+      'Post-Launch Lifecycle Architect + Product Vitality Commander. SRE, customer success, compliance, growth.',
+    model: 'opus',
+    thinkingLevel: 'high',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Radio',
+    personaId: 'bmad:echon',
   },
 ];
 
@@ -2971,7 +2983,7 @@ export const useAppStore = create<AppState & AppActions>()(
     }),
     {
       name: 'automaker-storage',
-      version: 3, // Increment when making breaking changes to persisted state
+      version: 4, // Increment when making breaking changes to persisted state
       // Custom merge function to properly restore terminal settings on every load
       // The default shallow merge doesn't work because we persist terminalSettings
       // separately from terminalState (to avoid persisting session data like tabs)
@@ -3053,6 +3065,18 @@ export const useAppStore = create<AppState & AppActions>()(
             ...existingProfiles,
             ...DEFAULT_AI_PROFILES.filter((p) => !existingIds.has(p.id)),
           ];
+        }
+
+        // Migration from version 3 to version 4:
+        // - Update all built-in BMAD profiles to use opus model
+        if (version <= 3) {
+          const existingProfiles = (state.aiProfiles as AIProfile[] | undefined) ?? [];
+          const defaultProfileIds = new Set(DEFAULT_AI_PROFILES.map((p) => p.id));
+          const userProfiles = existingProfiles.filter(
+            (p) => !p.isBuiltIn && !defaultProfileIds.has(p.id)
+          );
+          // Replace all built-in profiles with latest defaults, preserve user profiles
+          state.aiProfiles = [...DEFAULT_AI_PROFILES, ...userProfiles];
         }
 
         // Ensure project-keyed maps are initialized (prevent undefined access errors)

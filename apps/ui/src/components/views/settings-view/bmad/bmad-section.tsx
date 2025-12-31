@@ -71,15 +71,15 @@ export function BmadSection({ projectPath }: BmadSectionProps) {
         scaffoldMethodology,
       });
       if (result?.success && result.status) {
-        toast.success('BMAD initialized', {
+        toast.success('BMAD installed', {
           description: `Installed to _bmad/ • Artifacts: ${result.status.artifactsDir}`,
         });
         await loadStatus();
       } else {
-        toast.error('Failed to initialize BMAD', { description: result?.error || 'Unknown error' });
+        toast.error('Failed to install BMAD', { description: result?.error || 'Unknown error' });
       }
     } catch (e) {
-      toast.error('Failed to initialize BMAD', {
+      toast.error('Failed to install BMAD', {
         description: e instanceof Error ? e.message : 'Unknown error',
       });
     } finally {
@@ -142,7 +142,8 @@ export function BmadSection({ projectPath }: BmadSectionProps) {
           <h2 className="text-lg font-semibold text-foreground tracking-tight">BMAD</h2>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Install BMAD workflows to <code>_bmad/</code> and configure git-friendly artifacts.
+          Install BMAD to <code>_bmad/</code> (includes the 10-agent Executive Suite) and configure
+          git-friendly artifacts.
         </p>
       </div>
 
@@ -184,7 +185,7 @@ export function BmadSection({ projectPath }: BmadSectionProps) {
               data-testid="bmad-initialize-button"
             >
               <Download className="w-4 h-4 mr-2" />
-              Initialize BMAD
+              Install BMAD
             </Button>
             <Button
               size="sm"

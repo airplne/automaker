@@ -180,7 +180,7 @@ workflow-init asks: "Is this work in progress or previous effort?"
    - Phase 3 needs Phase 2 complete
    - Phase 4 needs Phase 3 complete (if Level 3-4)
 3. **Restart workflow** - Load agent in new chat and restart
-4. **Check status file** - Verify `bmm-workflow-status.yaml` and `sprint-status.yaml` are present and valid
+4. **Check status file** - Verify `bmm-workflow-status.md` or `sprint-status.yaml` is present and valid
 
 ### Problem: Agent says "workflow not found"
 
@@ -387,21 +387,18 @@ For most brownfield projects, **Deep scan is sufficient**.
 - Documentation scattered
 
 **Solution:**
-Check `_bmad/bmm/config.yaml` for configured paths:
+Check `bmad/bmm/config.yaml` for configured paths:
 
 ```yaml
-output_folder: '{project-root}/_bmad-output'
-planning_artifacts: '{project-root}/_bmad-output/planning-artifacts'
-implementation_artifacts: '{project-root}/_bmad-output/implementation-artifacts'
-project_knowledge: '{project-root}/docs'
+output_folder: '{project-root}/docs'
+dev_story_location: '{project-root}/docs/stories'
 ```
 
 Default locations:
 
-- Planning docs (PRD, epics, architecture): `{planning_artifacts}/`
-- Implementation artifacts (stories, dev outputs): `{implementation_artifacts}/`
-- Long-term project knowledge (research/docs): `{project_knowledge}/`
-- Status files: `{planning_artifacts}/bmm-workflow-status.yaml` (or `{output_folder}/bmm-workflow-status.yaml`), `{implementation_artifacts}/sprint-status.yaml` (or `{output_folder}/sprint-status.yaml`)
+- Planning docs (PRD, epics, architecture): `{output_folder}/`
+- Stories: `{dev_story_location}/`
+- Status files: `{output_folder}/bmm-workflow-status.md`, `{output_folder}/sprint-status.yaml`
 
 To change locations, edit config.yaml then re-run workflows.
 
@@ -415,15 +412,15 @@ To change locations, edit config.yaml then re-run workflows.
 
 **Solution:**
 
-1. **Check default location**: `_bmad-output/planning-artifacts/bmm-workflow-status.yaml` (or `_bmad-output/bmm-workflow-status.yaml`)
+1. **Check default location**: `docs/bmm-workflow-status.md`
 2. **If missing, reinitialize**:
    ```
    Load Analyst agent → run workflow-init
    ```
-3. **For Phase 4**: Look for `_bmad-output/implementation-artifacts/sprint-status.yaml` (or `_bmad-output/sprint-status.yaml`)
+3. **For Phase 4**: Look for `sprint-status.yaml` in same folder as PRD
 4. **Search for it**:
    ```bash
-   find . -name "bmm-workflow-status.yaml"
+   find . -name "bmm-workflow-status.md"
    find . -name "sprint-status.yaml"
    ```
 

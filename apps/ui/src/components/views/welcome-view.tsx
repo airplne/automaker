@@ -297,14 +297,14 @@ export function WelcomeView() {
 </project_specification>`
       );
 
-      // Initialize BMAD (optional)
+      // Install BMAD (optional)
       if (bmad?.enabled) {
         const result = await api.bmad?.initialize(projectPath, {
           artifactsDir: bmad.artifactsDir,
           scaffoldMethodology: bmad.scaffoldMethodology,
         });
         if (!result?.success) {
-          toast.error('BMAD initialization failed', {
+          toast.error('BMAD install failed', {
             description: result?.error || 'Unknown error',
           });
         }
@@ -409,14 +409,14 @@ export function WelcomeView() {
 </project_specification>`
       );
 
-      // Initialize BMAD (optional)
+      // Install BMAD (optional)
       if (bmad?.enabled) {
         const result = await api.bmad?.initialize(projectPath, {
           artifactsDir: bmad.artifactsDir,
           scaffoldMethodology: bmad.scaffoldMethodology,
         });
         if (!result?.success) {
-          toast.error('BMAD initialization failed', {
+          toast.error('BMAD install failed', {
             description: result?.error || 'Unknown error',
           });
         }
@@ -520,14 +520,14 @@ export function WelcomeView() {
 </project_specification>`
       );
 
-      // Initialize BMAD (optional)
+      // Install BMAD (optional)
       if (bmad?.enabled) {
         const result = await api.bmad?.initialize(projectPath, {
           artifactsDir: bmad.artifactsDir,
           scaffoldMethodology: bmad.scaffoldMethodology,
         });
         if (!result?.success) {
-          toast.error('BMAD initialization failed', {
+          toast.error('BMAD install failed', {
             description: result?.error || 'Unknown error',
           });
         }

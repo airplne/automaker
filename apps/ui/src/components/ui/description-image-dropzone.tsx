@@ -1,9 +1,16 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { ImageIcon, X, Loader2, FileText } from 'lucide-react';
+import { ImageIcon, X, Loader2, FileText, AtSign } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { getElectronAPI } from '@/lib/electron';
 import { useAppStore, type FeatureImagePath, type FeatureTextFilePath } from '@/store/app-store';
+import {
+  extractFileMentions,
+  removeFileMention,
+  getCurrentMention,
+  replaceMention,
+} from '@/lib/file-mentions';
+import { useFileIndex } from '@/hooks/use-file-index';
 import {
   sanitizeFilename,
   fileToBase64,
@@ -43,6 +50,7 @@ interface DescriptionImageDropZoneProps {
   onPreviewMapChange?: (map: ImagePreviewMap) => void;
   autoFocus?: boolean;
   error?: boolean; // Show error state with red border
+  projectPath?: string; // For @ mention file search
 }
 
 export function DescriptionImageDropZone({
@@ -61,6 +69,7 @@ export function DescriptionImageDropZone({
   onPreviewMapChange,
   autoFocus = false,
   error = false,
+  projectPath,
 }: DescriptionImageDropZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -68,6 +77,12 @@ export function DescriptionImageDropZone({
   const [localPreviewImages, setLocalPreviewImages] = useState<Map<string, string>>(
     () => new Map()
   );
+
+  // State and hooks for @ mention functionality
+  const [showMentionPicker, setShowMentionPicker] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [cursorPosition, setCursorPosition] = useState(0);
 
   // Determine which preview map to use - prefer parent-controlled state
   const previewImages = previewMap !== undefined ? previewMap : localPreviewImages;
@@ -89,6 +104,15 @@ export function DescriptionImageDropZone({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const currentProject = useAppStore((state) => state.currentProject);
+
+  // File index for @ mention suggestions
+  const { search: searchFiles, isIndexing: isIndexingFiles } = useFileIndex({
+    projectPath: currentProject?.path ?? null,
+    enabled: true,
+  });
+
+  // Get @ mentioned files from the current value
+  const referencedFiles = extractFileMentions(value);
 
   // Construct server URL for loading saved images
   const getImageServerUrl = useCallback(
@@ -317,6 +341,62 @@ export function DescriptionImageDropZone({
     [textFiles, onTextFilesChange]
   );
 
+  // Handlers for @ mention picker
+  const handleTextareaKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Escape' && showMentionPicker) {
+        setShowMentionPicker(false);
+        e.preventDefault();
+      }
+    },
+    [showMentionPicker]
+  );
+
+  const handleTextareaInput = useCallback((e: React.FormEvent<HTMLTextAreaElement>) => {
+    const target = e.target as HTMLTextAreaElement;
+    const cursorPos = target.selectionStart || 0;
+    setCursorPosition(cursorPos);
+
+    const currentMention = getCurrentMention(target.value, cursorPos);
+    if (currentMention !== null) {
+      setMentionQuery(currentMention);
+      setShowMentionPicker(true);
+    } else {
+      setShowMentionPicker(false);
+      setMentionQuery('');
+    }
+  }, []);
+
+  const handleSelectFile = useCallback(
+    (filePath: string) => {
+      const { text: newText, cursorPosition: newCursor } = replaceMention(
+        value,
+        cursorPosition,
+        filePath
+      );
+      onChange(newText);
+      setShowMentionPicker(false);
+      setMentionQuery('');
+
+      // Restore focus to textarea
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(newCursor, newCursor);
+        }
+      }, 0);
+    },
+    [value, cursorPosition, onChange]
+  );
+
+  const handleRemoveReference = useCallback(
+    (mention: string) => {
+      const newText = removeFileMention(value, mention);
+      onChange(newText);
+    },
+    [value, onChange]
+  );
+
   // Handle paste events to detect and process images from clipboard
   // Works across all OS (Windows, Linux, macOS)
   const handlePaste = useCallback(
@@ -399,16 +479,48 @@ export function DescriptionImageDropZone({
 
         {/* Textarea */}
         <Textarea
+          ref={textareaRef}
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onPaste={handlePaste}
+          onKeyDown={handleTextareaKeyDown}
+          onInput={handleTextareaInput}
           disabled={disabled}
           autoFocus={autoFocus}
           aria-invalid={error}
           className={cn('min-h-[120px]', isProcessing && 'opacity-50 pointer-events-none')}
           data-testid="feature-description-input"
         />
+
+        {/* @ Mention Picker */}
+        {showMentionPicker && (
+          <div className="absolute z-20 mt-1 w-full max-h-[200px] overflow-y-auto bg-popover border border-border rounded-md shadow-lg">
+            {isIndexingFiles ? (
+              <div className="p-3 text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Indexing files...
+              </div>
+            ) : (
+              <>
+                {searchFiles(mentionQuery, 15).map((file) => (
+                  <button
+                    key={file.path}
+                    type="button"
+                    onClick={() => handleSelectFile(file.path)}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="truncate">{file.path}</span>
+                  </button>
+                ))}
+                {searchFiles(mentionQuery, 15).length === 0 && (
+                  <div className="p-3 text-sm text-muted-foreground">No matching files found</div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Hint text */}
@@ -534,6 +646,38 @@ export function DescriptionImageDropZone({
                   <p className="text-[10px] text-white truncate">{file.filename}</p>
                   <p className="text-[9px] text-white/70">{formatFileSize(file.content.length)}</p>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Referenced files from @ mentions */}
+      {referencedFiles.length > 0 && (
+        <div className="mt-3 space-y-2" data-testid="referenced-files-list">
+          <div className="flex items-center gap-2">
+            <AtSign className="w-3 h-3 text-muted-foreground" />
+            <p className="text-xs font-medium text-foreground">
+              {referencedFiles.length} file{referencedFiles.length > 1 ? 's' : ''} referenced
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {referencedFiles.map((mention) => (
+              <div
+                key={mention}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-xs"
+              >
+                <span className="text-muted-foreground">@</span>
+                <span className="truncate max-w-[150px]">{mention}</span>
+                {!disabled && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveReference(mention)}
+                    className="ml-1 hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
               </div>
             ))}
           </div>

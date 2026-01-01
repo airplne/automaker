@@ -1010,7 +1010,7 @@ const initialState: AppState = {
   enabledCursorModels: getAllCursorModelIds(), // All Cursor models enabled by default
   cursorDefaultModel: 'auto', // Default to auto selection
   autoLoadClaudeMd: false, // Default to disabled (user must opt-in)
-  enableSandboxMode: true, // Default to enabled for security (can be disabled if issues occur)
+  enableSandboxMode: false, // Default to disabled (can be enabled for additional security)
   mcpServers: [], // No MCP servers configured by default
   mcpAutoApproveTools: true, // Default to enabled - bypass permission prompts for MCP tools
   mcpUnrestrictedTools: true, // Default to enabled - don't filter allowedTools when MCP enabled

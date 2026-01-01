@@ -161,3 +161,6 @@ export type {
   PipelineStatus,
   FeatureStatusWithPipeline,
 } from './pipeline.js';
+
+// Port configuration
+export { STATIC_PORT, SERVER_PORT, RESERVED_PORTS } from './ports.js';

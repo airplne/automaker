@@ -192,9 +192,8 @@ export class FeatureLoader {
       })) as any[];
       const featureDirs = entries.filter((entry) => entry.isDirectory());
 
-      // Load each feature
-      const features: Feature[] = [];
-      for (const dir of featureDirs) {
+      // Load all features concurrently (secureFs has built-in concurrency limiting)
+      const featurePromises = featureDirs.map(async (dir) => {
         const featureId = dir.name;
         const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
 
@@ -206,13 +205,13 @@ export class FeatureLoader {
             logger.warn(
               `[FeatureLoader] Feature ${featureId} missing required 'id' field, skipping`
             );
-            continue;
+            return null;
           }
 
-          features.push(feature);
+          return feature as Feature;
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-            continue;
+            return null;
           } else if (error instanceof SyntaxError) {
             logger.warn(
               `[FeatureLoader] Failed to parse feature.json for ${featureId}: ${error.message}`
@@ -223,8 +222,12 @@ export class FeatureLoader {
               (error as Error).message
             );
           }
+          return null;
         }
-      }
+      });
+
+      const results = await Promise.all(featurePromises);
+      const features = results.filter((f): f is Feature => f !== null);
 
       // Sort by creation order (feature IDs contain timestamp)
       features.sort((a, b) => {

@@ -1,3 +1,5 @@
+import type { FeatureStatusWithPipeline, PipelineConfig } from '@automaker/types';
+
 export type ColumnId = 'backlog' | 'in_progress' | 'waiting_approval' | 'verified' | 'completed';
 
 export interface Column {

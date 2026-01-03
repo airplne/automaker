@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +54,7 @@ import {
   BranchSelector,
   PlanningModeSelector,
   AncestorContextSection,
+  AgentsTabContent,
 } from '../shared';
 import {
   DropdownMenu,
@@ -66,7 +68,11 @@ import {
   formatAncestorContextForPrompt,
   type AncestorContext,
 } from '@automaker/dependency-resolver';
-import { ALL_EXECUTIVE_AGENT_IDS, MAX_EXECUTIVE_AGENTS } from '@/config/bmad-agents';
+import { ALL_BMAD_AGENT_IDS, ALL_EXECUTIVE_AGENT_IDS, AGENT_MODULES } from '@/config/bmad-agents';
+
+// Use ALL_BMAD_AGENT_IDS for full access to all 29 agents
+// Legacy MAX_EXECUTIVE_AGENTS removed - no selection limit
+const MAX_AGENTS = ALL_BMAD_AGENT_IDS.length; // 29
 import { buildEnhanceInput, loadReferencedFiles } from '@/lib/enhance-with-ai';
 
 type FeatureData = {
@@ -79,6 +85,10 @@ type FeatureData = {
   skipTests: boolean;
   model: AgentModel;
   thinkingLevel: ThinkingLevel;
+  aiProfileId?: string | null;
+  personaId?: string | null;
+  agentIds?: string[];
+  verboseCollaboration?: boolean;
   branchName: string; // Can be empty string to use current branch
   priority: number;
   planningMode: PlanningMode;
@@ -90,6 +100,25 @@ interface AddFeatureDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAdd: (feature: {
+    title: string;
+    category: string;
+    description: string;
+    images: FeatureImage[];
+    imagePaths: DescriptionImagePath[];
+    textFilePaths: DescriptionTextFilePath[];
+    skipTests: boolean;
+    model: AgentModel;
+    thinkingLevel: ThinkingLevel;
+    aiProfileId?: string | null;
+    personaId?: string | null;
+    agentIds?: string[];
+    branchName: string; // Can be empty string to use current branch
+    priority: number;
+    planningMode: PlanningMode;
+    requirePlanApproval: boolean;
+    dependencies?: string[];
+  }) => void;
+  onAddAndStart?: (feature: {
     title: string;
     category: string;
     description: string;
@@ -171,6 +200,7 @@ export function AddFeatureDialog({
   const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set());
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['executive']));
   const [usePartyMode, setUsePartyMode] = useState(true); // Party Mode is default
+  const [verboseCollaboration, setVerboseCollaboration] = useState(false);
 
   const { personas: bmadPersonas, isLoading: isLoadingPersonas } = useBmadPersonas({
     enabled: open,
@@ -211,9 +241,21 @@ export function AddFeatureDialog({
       setUseCurrentBranch(true);
       setPlanningMode(defaultPlanningMode);
       setRequirePlanApproval(defaultRequirePlanApproval);
-      // Initialize Party Mode with all executive agents selected by default
-      setUsePartyMode(true);
-      setSelectedAgentIds(new Set(ALL_EXECUTIVE_AGENT_IDS));
+      // Only initialize Party Mode if default profile is Party Synthesis
+      const isDefaultPartyMode = defaultProfile?.personaId === 'bmad:party-synthesis';
+      if (isDefaultPartyMode) {
+        setUsePartyMode(true);
+        const agentsWithFinnFirst = [
+          'bmad:fulfillization-manager',
+          ...ALL_BMAD_AGENT_IDS.filter((id) => id !== 'bmad:fulfillization-manager'),
+        ];
+        setSelectedAgentIds(new Set(agentsWithFinnFirst));
+        setPlanningMode('spec');
+        setRequirePlanApproval(true);
+      } else {
+        setUsePartyMode(false);
+        setSelectedAgentIds(new Set());
+      }
 
       // Initialize ancestors for spawn mode
       if (parentFeature) {
@@ -298,6 +340,7 @@ export function AddFeatureDialog({
       aiProfileId: selectedProfileId,
       personaId: selectedPersonaId,
       agentIds: selectedAgentIds.size > 0 ? Array.from(selectedAgentIds) : undefined,
+      verboseCollaboration: verboseCollaboration || undefined,
       branchName: finalBranchName,
       priority: newFeature.priority,
       planningMode,
@@ -424,9 +467,28 @@ export function AddFeatureDialog({
 
   const handleProfileSelect = (profile: AIProfile) => {
     setSelectedProfileId(profile.id);
-    if (profile.personaId) {
+
+    if (profile.personaId === 'bmad:party-synthesis') {
       setSelectedPersonaId(profile.personaId);
+      // Enable Party Mode when selecting Party Synthesis
+      if (!usePartyMode) {
+        const agentsWithFinnFirst = [
+          'bmad:fulfillization-manager',
+          ...ALL_BMAD_AGENT_IDS.filter((id) => id !== 'bmad:fulfillization-manager'),
+        ];
+        setSelectedAgentIds(new Set(agentsWithFinnFirst));
+        setUsePartyMode(true);
+      }
+    } else {
+      setSelectedPersonaId(null);
+      // Only clear if switching TO a persona-based profile
+      if (profile.personaId) {
+        setSelectedAgentIds(new Set());
+        setUsePartyMode(false);
+      }
+      // Model-only profiles (Heavy Task, etc.) preserve agent selection
     }
+
     setNewFeature({
       ...newFeature,
       model: profile.model,
@@ -436,9 +498,16 @@ export function AddFeatureDialog({
 
   const newModelAllowsThinking = modelSupportsThinking(newFeature.model);
 
-  // Filter out BMAD profiles (those with personaId) from Quick Select
-  // BMAD personas are now selected on the Prompt tab, not via profiles
+  // Filter profiles for Quick Select: model-only profiles (no personaId)
+  // Individual BMAD agent profiles are selected on the Prompt tab, not via quick select
   const modelOnlyProfiles = useMemo(() => aiProfiles.filter((p) => !p.personaId), [aiProfiles]);
+
+  // Check if selected profile is Party Synthesis - agent selection only shows for this profile
+  const isPartySynthesisSelected = useMemo(() => {
+    if (!selectedProfileId) return false;
+    const profile = aiProfiles.find((p) => p.id === selectedProfileId);
+    return profile?.personaId === 'bmad:party-synthesis';
+  }, [selectedProfileId, aiProfiles]);
 
   // Multi-select agent toggle function
   const toggleAgentSelection = (agentId: string) => {
@@ -446,20 +515,32 @@ export function AddFeatureDialog({
       const next = new Set(prev);
       if (next.has(agentId)) {
         next.delete(agentId);
-      } else if (next.size < MAX_EXECUTIVE_AGENTS) {
+      } else if (next.size < MAX_AGENTS) {
         next.add(agentId);
       }
       return next;
     });
   };
 
-  // Toggle Party Mode - selects all executive agents or clears to individual selection
+  // Toggle Party Mode - selects all 29 BMAD agents or clears to individual selection
   const togglePartyMode = (enabled: boolean) => {
     setUsePartyMode(enabled);
     if (enabled) {
-      setSelectedAgentIds(new Set(ALL_EXECUTIVE_AGENT_IDS));
+      // Finn (fulfillization-manager) leads the collaboration
+      const agentsWithFinnFirst = [
+        'bmad:fulfillization-manager',
+        ...ALL_BMAD_AGENT_IDS.filter((id) => id !== 'bmad:fulfillization-manager'),
+      ];
+      setSelectedAgentIds(new Set(agentsWithFinnFirst));
+
+      // Party Mode requires collaborative spec with approval
+      setPlanningMode('spec');
+      setRequirePlanApproval(true);
     } else {
       setSelectedAgentIds(new Set());
+      // Reset to defaults when Party Mode disabled
+      setPlanningMode('skip');
+      setRequirePlanApproval(false);
     }
   };
 
@@ -475,29 +556,33 @@ export function AddFeatureDialog({
     });
   };
 
-  // Agent categories - Executive Suite agents only
+  // Agent categories - All 5 modules (core, builders, method, executive, creative)
   const agentCategories = useMemo(() => {
-    const executiveAgents = ALL_EXECUTIVE_AGENT_IDS.map((agentId) =>
-      bmadPersonas.find((p) => p.id === agentId)
-    )
-      .filter((agent): agent is NonNullable<typeof agent> => agent !== undefined)
-      .map((agent) => ({
-        id: agent.id,
-        label: agent.label,
-        icon: agent.icon ?? '🤖',
-      }));
+    const categories: Record<
+      string,
+      { label: string; agents: Array<{ id: string; label: string; icon: string }> }
+    > = {};
 
-    const filteredCategories: Record<string, { label: string; agents: typeof executiveAgents }> =
-      {};
+    // Iterate over all 5 BMAD modules
+    Object.entries(AGENT_MODULES).forEach(([moduleKey, module]) => {
+      const moduleAgents = module.agents
+        .map((agentId) => bmadPersonas.find((p) => p.id === agentId))
+        .filter((agent): agent is NonNullable<typeof agent> => agent !== undefined)
+        .map((agent) => ({
+          id: agent.id,
+          label: agent.label,
+          icon: agent.icon ?? '🤖',
+        }));
 
-    if (executiveAgents.length > 0) {
-      filteredCategories.executive = {
-        label: 'Executive Agents',
-        agents: executiveAgents,
-      };
-    }
+      if (moduleAgents.length > 0) {
+        categories[moduleKey] = {
+          label: module.label,
+          agents: moduleAgents,
+        };
+      }
+    });
 
-    return filteredCategories;
+    return categories;
   }, [bmadPersonas]);
 
   // Agent checkbox item component
@@ -565,7 +650,7 @@ export function AddFeatureDialog({
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="prompt" className="py-4 flex-1 min-h-0 flex flex-col">
-          <TabsList className="w-full grid grid-cols-3 mb-4">
+          <TabsList className="w-full grid grid-cols-4 mb-4">
             <TabsTrigger value="prompt" data-testid="tab-prompt">
               <MessageSquare className="w-4 h-4 mr-2" />
               Prompt
@@ -573,6 +658,15 @@ export function AddFeatureDialog({
             <TabsTrigger value="model" data-testid="tab-model">
               <Settings2 className="w-4 h-4 mr-2" />
               Model
+            </TabsTrigger>
+            <TabsTrigger value="agents" data-testid="tab-agents">
+              <Users className="w-4 h-4 mr-2" />
+              Agents
+              {selectedAgentIds.size > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {selectedAgentIds.size}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="options" data-testid="tab-options">
               <SlidersHorizontal className="w-4 h-4 mr-2" />
@@ -680,168 +774,6 @@ export function AddFeatureDialog({
               />
             </div>
 
-            {/* BMAD Agent Collaboration Selection */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Executive Agent Collaboration</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {selectedAgentIds.size}/{MAX_EXECUTIVE_AGENTS} selected
-                  </span>
-                  {!usePartyMode && selectedAgentIds.size > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs"
-                      onClick={() => setSelectedAgentIds(new Set())}
-                    >
-                      Clear All
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {isLoadingPersonas ? (
-                <div className="text-sm text-muted-foreground p-4 text-center">
-                  Loading agents...
-                </div>
-              ) : (
-                <div className="space-y-3" data-testid="feature-agent-select">
-                  {/* Party Mode Toggle - Primary Option */}
-                  <div
-                    className={cn(
-                      'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                      usePartyMode
-                        ? 'bg-primary/10 border-primary'
-                        : 'hover:bg-muted/50 border-border'
-                    )}
-                    onClick={() => togglePartyMode(true)}
-                  >
-                    <div
-                      className={cn(
-                        'w-10 h-10 rounded-full flex items-center justify-center',
-                        usePartyMode ? 'bg-primary text-primary-foreground' : 'bg-muted'
-                      )}
-                    >
-                      <Users className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Party Mode</span>
-                        <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
-                          Recommended
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        All 9 executive agents collaborate: Sage, Theo, Finn, Cerberus, Mary, Walt,
-                        Axel, Apex, Zen
-                      </p>
-                    </div>
-                    <Checkbox
-                      checked={usePartyMode}
-                      onCheckedChange={() => togglePartyMode(true)}
-                    />
-                  </div>
-
-                  {/* Individual Selection Toggle */}
-                  <div
-                    className={cn(
-                      'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                      !usePartyMode
-                        ? 'bg-muted/30 border-border'
-                        : 'hover:bg-muted/50 border-border'
-                    )}
-                    onClick={() => togglePartyMode(false)}
-                  >
-                    <div
-                      className={cn(
-                        'w-10 h-10 rounded-full flex items-center justify-center',
-                        !usePartyMode ? 'bg-muted-foreground/20' : 'bg-muted'
-                      )}
-                    >
-                      <UserCog className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1">
-                      <span className="font-medium">Select Individual Agents</span>
-                      <p className="text-xs text-muted-foreground">
-                        Choose specific agents (up to {MAX_EXECUTIVE_AGENTS})
-                      </p>
-                    </div>
-                    <Checkbox
-                      checked={!usePartyMode}
-                      onCheckedChange={() => togglePartyMode(false)}
-                    />
-                  </div>
-
-                  {/* Individual Agent Selection (shown when not in Party Mode) */}
-                  {!usePartyMode && (
-                    <div className="border rounded-md p-3 max-h-[300px] overflow-y-auto space-y-3">
-                      {Object.entries(agentCategories).map(([categoryKey, category]) => {
-                        const isExpanded = expandedCategories.has(categoryKey);
-                        const selectedInCategory = category.agents.filter((agent) =>
-                          selectedAgentIds.has(agent.id)
-                        ).length;
-
-                        return (
-                          <div key={categoryKey} className="space-y-2">
-                            <div
-                              className="flex items-center justify-between cursor-pointer hover:bg-muted/50 p-1 rounded-md transition-colors"
-                              onClick={() => toggleCategory(categoryKey)}
-                            >
-                              <div className="flex items-center gap-2">
-                                {isExpanded ? (
-                                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                                ) : (
-                                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                                )}
-                                <span className="text-sm font-medium">{category.label}</span>
-                                {selectedInCategory > 0 && (
-                                  <span className="text-xs text-muted-foreground">
-                                    ({selectedInCategory})
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            {isExpanded && (
-                              <div className="space-y-1 ml-6">
-                                {category.agents.map((agent) => {
-                                  const isSelected = selectedAgentIds.has(agent.id);
-                                  const isDisabled =
-                                    !isSelected && selectedAgentIds.size >= MAX_EXECUTIVE_AGENTS;
-                                  const selectedArray = Array.from(selectedAgentIds);
-                                  const orderNumber = isSelected
-                                    ? selectedArray.indexOf(agent.id) + 1
-                                    : 0;
-
-                                  return (
-                                    <AgentCheckboxItem
-                                      key={agent.id}
-                                      agent={agent}
-                                      isSelected={isSelected}
-                                      isDisabled={isDisabled}
-                                      onToggle={() => toggleAgentSelection(agent.id)}
-                                      orderNumber={orderNumber}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <p className="text-xs text-muted-foreground">
-                {usePartyMode
-                  ? `Party Mode: All ${MAX_EXECUTIVE_AGENTS} executive agents deliberate and synthesize a unified recommendation.`
-                  : `Select up to ${MAX_EXECUTIVE_AGENTS} executive agents for collaborative execution.`}
-              </p>
-            </div>
-
             {useWorktrees && (
               <BranchSelector
                 useCurrentBranch={useCurrentBranch}
@@ -922,6 +854,21 @@ export function AddFeatureDialog({
             )}
           </TabsContent>
 
+          {/* Agents Tab */}
+          <TabsContent value="agents" className="space-y-4 overflow-y-auto cursor-default">
+            <AgentsTabContent
+              selectedAgentIds={selectedAgentIds}
+              onSelectedAgentIdsChange={setSelectedAgentIds}
+              usePartyMode={usePartyMode}
+              onPartyModeChange={togglePartyMode}
+              expandedCategories={expandedCategories}
+              onExpandedCategoriesChange={setExpandedCategories}
+              verboseCollaboration={verboseCollaboration}
+              onVerboseCollaborationChange={setVerboseCollaboration}
+              testIdPrefix="add"
+            />
+          </TabsContent>
+
           {/* Options Tab */}
           <TabsContent value="options" className="space-y-4 overflow-y-auto cursor-default">
             {/* Planning Mode Section */}
@@ -933,6 +880,8 @@ export function AddFeatureDialog({
               featureDescription={newFeature.description}
               testIdPrefix="add-feature"
               compact
+              agentCount={selectedAgentIds.size}
+              usePartyMode={usePartyMode}
             />
 
             <div className="border-t border-border my-4" />

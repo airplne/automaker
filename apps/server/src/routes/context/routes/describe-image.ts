@@ -186,7 +186,7 @@ async function extractTextFromStream(
   let responseText = '';
   let messageCount = 0;
 
-  logger.info(`[${requestId}] [Stream] Begin reading SDK stream...`);
+  logger.debug(`[${requestId}] [Stream] Begin reading SDK stream...`);
 
   for await (const msg of stream) {
     messageCount++;
@@ -194,13 +194,13 @@ async function extractTextFromStream(
     const msgSubtype = msg?.subtype;
 
     // Keep this concise but informative. Full error object is logged in catch blocks.
-    logger.info(
+    logger.debug(
       `[${requestId}] [Stream] #${messageCount} type=${String(msgType)} subtype=${String(msgSubtype ?? '')}`
     );
 
     if (msgType === 'assistant' && msg.message?.content) {
       const blocks = msg.message.content as Array<{ type: string; text?: string }>;
-      logger.info(`[${requestId}] [Stream] assistant blocks=${blocks.length}`);
+      logger.debug(`[${requestId}] [Stream] assistant blocks=${blocks.length}`);
       for (const block of blocks) {
         if (block.type === 'text' && block.text) {
           responseText += block.text;
@@ -215,7 +215,7 @@ async function extractTextFromStream(
     }
   }
 
-  logger.info(
+  logger.debug(
     `[${requestId}] [Stream] End of stream. messages=${messageCount} textLength=${responseText.length}`
   );
 
@@ -240,9 +240,9 @@ export function createDescribeImageHandler(
 
     // Request envelope logs (high value when correlating failures)
     // Only log safe headers to prevent leaking sensitive values (auth tokens, cookies, etc.)
-    logger.info(`[${requestId}] ===== POST /api/context/describe-image =====`);
-    logger.info(`[${requestId}] headers=${JSON.stringify(filterSafeHeaders(req.headers))}`);
-    logger.info(`[${requestId}] body=${JSON.stringify(req.body)}`);
+    logger.debug(`[${requestId}] ===== POST /api/context/describe-image =====`);
+    logger.debug(`[${requestId}] headers=${JSON.stringify(filterSafeHeaders(req.headers))}`);
+    logger.debug(`[${requestId}] body=${JSON.stringify(req.body)}`);
 
     try {
       const { imagePath } = req.body as DescribeImageRequestBody;
@@ -258,7 +258,7 @@ export function createDescribeImageHandler(
         return;
       }
 
-      logger.info(`[${requestId}] imagePath="${imagePath}" type=${typeof imagePath}`);
+      logger.debug(`[${requestId}] imagePath="${imagePath}" type=${typeof imagePath}`);
 
       // Find the actual file path (handles Unicode space character variations)
       const actualPath = findActualFilePath(imagePath);
@@ -277,7 +277,7 @@ export function createDescribeImageHandler(
       }
 
       if (actualPath !== imagePath) {
-        logger.info(`[${requestId}] Using actual path: ${actualPath}`);
+        logger.debug(`[${requestId}] Using actual path: ${actualPath}`);
       }
 
       // Mock mode for CI/E2E testing - avoid calling Claude for vision
@@ -294,7 +294,7 @@ export function createDescribeImageHandler(
       let stat: fs.Stats | null = null;
       try {
         stat = fs.statSync(actualPath);
-        logger.info(
+        logger.debug(
           `[${requestId}] fileStats size=${stat.size} bytes mtime=${stat.mtime.toISOString()}`
         );
       } catch (statErr) {
@@ -304,15 +304,15 @@ export function createDescribeImageHandler(
       }
 
       // Read image and convert to base64 (same as agent runner)
-      logger.info(`[${requestId}] Reading image into base64...`);
+      logger.debug(`[${requestId}] Reading image into base64...`);
       const imageReadStart = Date.now();
       const imageData = await readImageAsBase64(actualPath);
       const imageReadMs = Date.now() - imageReadStart;
 
       const base64Length = imageData.base64.length;
       const estimatedBytes = Math.ceil((base64Length * 3) / 4);
-      logger.info(`[${requestId}] imageReadMs=${imageReadMs}`);
-      logger.info(
+      logger.debug(`[${requestId}] imageReadMs=${imageReadMs}`);
+      logger.debug(
         `[${requestId}] image meta filename=${imageData.filename} mime=${imageData.mimeType} base64Len=${base64Length} estBytes=${estimatedBytes}`
       );
 
@@ -335,10 +335,10 @@ export function createDescribeImageHandler(
         },
       ];
 
-      logger.info(`[${requestId}] Built multi-part prompt blocks=${promptContent.length}`);
+      logger.debug(`[${requestId}] Built multi-part prompt blocks=${promptContent.length}`);
 
       const cwd = path.dirname(actualPath);
-      logger.info(`[${requestId}] Using cwd=${cwd}`);
+      logger.debug(`[${requestId}] Using cwd=${cwd}`);
 
       // Load autoLoadClaudeMd setting
       const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
@@ -357,7 +357,7 @@ export function createDescribeImageHandler(
         sandbox: { enabled: true, autoAllowBashIfSandboxed: true },
       });
 
-      logger.info(
+      logger.debug(
         `[${requestId}] SDK options model=${sdkOptions.model} maxTurns=${sdkOptions.maxTurns} allowedTools=${JSON.stringify(
           sdkOptions.allowedTools
         )} sandbox=${JSON.stringify(sdkOptions.sandbox)}`
@@ -372,15 +372,15 @@ export function createDescribeImageHandler(
         };
       })();
 
-      logger.info(`[${requestId}] Calling query()...`);
+      logger.debug(`[${requestId}] Calling query()...`);
       const queryStart = Date.now();
       const stream = query({ prompt: promptGenerator, options: sdkOptions });
-      logger.info(`[${requestId}] query() returned stream in ${Date.now() - queryStart}ms`);
+      logger.debug(`[${requestId}] query() returned stream in ${Date.now() - queryStart}ms`);
 
       // Extract the description from the response
       const extractStart = Date.now();
       const description = await extractTextFromStream(stream, requestId);
-      logger.info(`[${requestId}] extractMs=${Date.now() - extractStart}`);
+      logger.debug(`[${requestId}] extractMs=${Date.now() - extractStart}`);
 
       if (!description || description.trim().length === 0) {
         logger.warn(`[${requestId}] Received empty response from Claude`);

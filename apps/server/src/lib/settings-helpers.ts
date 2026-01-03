@@ -30,7 +30,7 @@ export async function getAutoLoadClaudeMdSetting(
   logPrefix = '[SettingsHelper]'
 ): Promise<boolean> {
   if (!settingsService) {
-    logger.info(`${logPrefix} SettingsService not available, autoLoadClaudeMd disabled`);
+    logger.debug(`${logPrefix} SettingsService not available, autoLoadClaudeMd disabled`);
     return false;
   }
 
@@ -38,7 +38,7 @@ export async function getAutoLoadClaudeMdSetting(
     // Check project settings first (takes precedence)
     const projectSettings = await settingsService.getProjectSettings(projectPath);
     if (projectSettings.autoLoadClaudeMd !== undefined) {
-      logger.info(
+      logger.debug(
         `${logPrefix} autoLoadClaudeMd from project settings: ${projectSettings.autoLoadClaudeMd}`
       );
       return projectSettings.autoLoadClaudeMd;
@@ -47,7 +47,7 @@ export async function getAutoLoadClaudeMdSetting(
     // Fall back to global settings
     const globalSettings = await settingsService.getGlobalSettings();
     const result = globalSettings.autoLoadClaudeMd ?? false;
-    logger.info(`${logPrefix} autoLoadClaudeMd from global settings: ${result}`);
+    logger.debug(`${logPrefix} autoLoadClaudeMd from global settings: ${result}`);
     return result;
   } catch (error) {
     logger.error(`${logPrefix} Failed to load autoLoadClaudeMd setting:`, error);
@@ -68,14 +68,14 @@ export async function getEnableSandboxModeSetting(
   logPrefix = '[SettingsHelper]'
 ): Promise<boolean> {
   if (!settingsService) {
-    logger.info(`${logPrefix} SettingsService not available, sandbox mode disabled`);
+    logger.debug(`${logPrefix} SettingsService not available, sandbox mode disabled`);
     return false;
   }
 
   try {
     const globalSettings = await settingsService.getGlobalSettings();
     const result = globalSettings.enableSandboxMode ?? true;
-    logger.info(`${logPrefix} enableSandboxMode from global settings: ${result}`);
+    logger.debug(`${logPrefix} enableSandboxMode from global settings: ${result}`);
     return result;
   } catch (error) {
     logger.error(`${logPrefix} Failed to load enableSandboxMode setting:`, error);
@@ -180,13 +180,13 @@ export async function getMCPServersFromSettings(
       sdkServers[server.name] = convertToSdkFormat(server);
     }
 
-    logger.info(
+    logger.debug(
       `${logPrefix} Loaded ${enabledServers.length} MCP server(s): ${enabledServers.map((s) => s.name).join(', ')}`
     );
 
     return sdkServers;
   } catch (error) {
-    logger.error(`${logPrefix} Failed to load MCP servers setting:`, error);
+    logger.debug(`${logPrefix} Failed to load MCP servers setting:`, error);
     return {};
   }
 }
@@ -216,12 +216,12 @@ export async function getMCPPermissionSettings(
       mcpAutoApproveTools: globalSettings.mcpAutoApproveTools ?? true,
       mcpUnrestrictedTools: globalSettings.mcpUnrestrictedTools ?? true,
     };
-    logger.info(
+    logger.debug(
       `${logPrefix} MCP permission settings: autoApprove=${result.mcpAutoApproveTools}, unrestricted=${result.mcpUnrestrictedTools}`
     );
     return result;
   } catch (error) {
-    logger.error(`${logPrefix} Failed to load MCP permission settings:`, error);
+    logger.debug(`${logPrefix} Failed to load MCP permission settings:`, error);
     return defaults;
   }
 }
@@ -288,13 +288,13 @@ export async function getPromptCustomization(
     try {
       const globalSettings = await settingsService.getGlobalSettings();
       customization = globalSettings.promptCustomization || {};
-      logger.info(`${logPrefix} Loaded prompt customization from settings`);
+      logger.debug(`${logPrefix} Loaded prompt customization from settings`);
     } catch (error) {
-      logger.error(`${logPrefix} Failed to load prompt customization:`, error);
+      logger.debug(`${logPrefix} Failed to load prompt customization:`, error);
       // Fall through to use empty customization (all defaults)
     }
   } else {
-    logger.info(`${logPrefix} SettingsService not available, using default prompts`);
+    logger.debug(`${logPrefix} SettingsService not available, using default prompts`);
   }
 
   return {

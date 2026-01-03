@@ -24,7 +24,10 @@ import {
   isAbortError,
   classifyError,
   loadContextFiles,
+  createLogger,
 } from '@automaker/utils';
+
+const logger = createLogger('AutoMode');
 import { resolveModelString, DEFAULT_MODELS } from '@automaker/model-resolver';
 import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
 import { getFeatureDir, getAutomakerDir, getFeaturesDir } from '@automaker/platform';
@@ -299,7 +302,7 @@ export class AutoModeService {
 
     // Run the loop in the background
     this.runAutoLoop().catch((error) => {
-      console.error('[AutoMode] Loop error:', error);
+      logger.error('Loop error:', error);
       const errorInfo = classifyError(error);
       this.emitAutoModeEvent('auto_mode_error', {
         error: errorInfo.message,
@@ -344,13 +347,13 @@ export class AutoModeService {
             this.config!.useWorktrees,
             true
           ).catch((error) => {
-            console.error(`[AutoMode] Feature ${nextFeature.id} error:`, error);
+            logger.error(`Feature ${nextFeature.id} error:`, error);
           });
         }
 
         await this.sleep(2000);
       } catch (error) {
-        console.error('[AutoMode] Loop iteration error:', error);
+        logger.error('Loop iteration error:', error);
         await this.sleep(5000);
       }
     }
@@ -423,8 +426,8 @@ export class AutoModeService {
       if (!options?.continuationPrompt) {
         const hasExistingContext = await this.contextExists(projectPath, featureId);
         if (hasExistingContext) {
-          console.log(
-            `[AutoMode] Feature ${featureId} has existing context, resuming instead of starting fresh`
+          logger.debug(
+            `Feature ${featureId} has existing context, resuming instead of starting fresh`
           );
           // Remove from running features temporarily, resumeFeature will add it back
           this.runningFeatures.delete(featureId);
@@ -459,12 +462,10 @@ export class AutoModeService {
         worktreePath = await this.findExistingWorktreeForBranch(projectPath, branchName);
 
         if (worktreePath) {
-          console.log(`[AutoMode] Using worktree for branch "${branchName}": ${worktreePath}`);
+          logger.debug(`Using worktree for branch "${branchName}": ${worktreePath}`);
         } else {
           // Worktree doesn't exist - log warning and continue with project path
-          console.warn(
-            `[AutoMode] Worktree for branch "${branchName}" not found, using project path`
-          );
+          logger.warn(`Worktree for branch "${branchName}" not found, using project path`);
         }
       }
 
@@ -525,6 +526,21 @@ export class AutoModeService {
               ? [selectedProfile.personaId]
               : undefined;
 
+      // Determine and log execution mode for observability
+      const executionMode =
+        !effectiveAgentIds || effectiveAgentIds.length === 0
+          ? 'none'
+          : effectiveAgentIds.length === 1 && effectiveAgentIds[0] === 'bmad:party-synthesis'
+            ? 'party_synthesis'
+            : effectiveAgentIds.length === 1
+              ? 'single_agent'
+              : 'multi_agent';
+
+      logger.info(
+        `Execution mode: ${executionMode}, agents: ${effectiveAgentIds?.length ?? 0}` +
+          (effectiveAgentIds?.length ? ` [${effectiveAgentIds.slice(0, 3).join(', ')}...]` : '')
+      );
+
       let resolvedPersona: ResolvedPersona | null = null;
       let resolvedCollab: ResolvedAgentCollab | null = null;
 
@@ -533,6 +549,7 @@ export class AutoModeService {
           agentIds: effectiveAgentIds,
           artifactsDir: `${bmadArtifactsDir} (relative to project root)`,
           projectPath,
+          verboseMode: feature.verboseCollaboration ?? false,
         });
       } else if (effectiveAgentIds && effectiveAgentIds.length === 1) {
         resolvedPersona = await this.bmadPersonaService.resolvePersona({
@@ -601,7 +618,7 @@ export class AutoModeService {
         // Continuation prompt is used when recovering from a plan approval
         // The plan was already approved, so skip the planning phase
         prompt = options.continuationPrompt;
-        console.log(`[AutoMode] Using continuation prompt for feature ${featureId}`);
+        logger.debug(`Using continuation prompt for feature ${featureId}`);
       } else {
         // Normal flow: build prompt with planning phase
         const featurePrompt = this.buildFeaturePrompt(feature);
@@ -631,7 +648,30 @@ export class AutoModeService {
       const maxThinkingTokens =
         resolvedPersona?.thinkingBudget ??
         this.thinkingLevelToMaxThinkingTokens(feature.thinkingLevel);
-      console.log(`[AutoMode] Executing feature ${featureId} with model: ${model} in ${workDir}`);
+      logger.info(`Executing feature ${featureId} with model: ${model} in ${workDir}`);
+
+      // Create execution-context.json for observability
+      const featureDir = getFeatureDir(projectPath, featureId);
+      const executionContext = {
+        featureId,
+        timestamp: new Date().toISOString(),
+        mode: executionMode,
+        agentCount: effectiveAgentIds?.length ?? 0,
+        agentIds: effectiveAgentIds ?? [],
+        model,
+        thinkingLevel: feature.thinkingLevel,
+        planningMode: feature.planningMode,
+        hasMultiAgentHeader: combinedSystemPrompt.includes('# Multi-Agent Collaboration Mode'),
+        systemPromptLength: combinedSystemPrompt.length,
+      };
+
+      try {
+        const contextPath = path.join(featureDir, 'execution-context.json');
+        await secureFs.writeFile(contextPath, JSON.stringify(executionContext, null, 2));
+        logger.info(`Execution context saved: ${contextPath}`);
+      } catch (err) {
+        logger.warn('Failed to write execution-context.json:', err);
+      }
 
       // Run the agent with the feature's model and images
       // Context files are passed as system prompt for higher priority
@@ -696,7 +736,7 @@ export class AutoModeService {
           projectPath,
         });
       } else {
-        console.error(`[AutoMode] Feature ${featureId} failed:`, error);
+        logger.error(`Feature ${featureId} failed:`, error);
         await this.updateFeatureStatus(projectPath, featureId, 'backlog');
         this.emitAutoModeEvent('auto_mode_error', {
           featureId,
@@ -706,9 +746,9 @@ export class AutoModeService {
         });
       }
     } finally {
-      console.log(`[AutoMode] Feature ${featureId} execution ended, cleaning up runningFeatures`);
-      console.log(
-        `[AutoMode] Pending approvals at cleanup: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
+      logger.info(`Feature ${featureId} execution ended, cleaning up runningFeatures`);
+      logger.debug(
+        `Pending approvals at cleanup: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
       );
       this.runningFeatures.delete(featureId);
     }
@@ -726,7 +766,7 @@ export class AutoModeService {
     abortController: AbortController,
     autoLoadClaudeMd: boolean
   ): Promise<void> {
-    console.log(`[AutoMode] Executing ${steps.length} pipeline step(s) for feature ${featureId}`);
+    logger.debug(`Executing ${steps.length} pipeline step(s) for feature ${featureId}`);
 
     // Load context files once
     const contextResult = await loadContextFiles({
@@ -808,12 +848,12 @@ export class AutoModeService {
         projectPath,
       });
 
-      console.log(
-        `[AutoMode] Pipeline step ${i + 1}/${steps.length} (${step.name}) completed for feature ${featureId}`
+      logger.debug(
+        `Pipeline step ${i + 1}/${steps.length} (${step.name}) completed for feature ${featureId}`
       );
     }
 
-    console.log(`[AutoMode] All pipeline steps completed for feature ${featureId}`);
+    logger.debug(`All pipeline steps completed for feature ${featureId}`);
   }
 
   /**
@@ -933,7 +973,7 @@ Complete the pipeline step instructions above. Review the previous work and appl
 
       if (worktreePath) {
         workDir = worktreePath;
-        console.log(`[AutoMode] Follow-up using worktree for branch "${branchName}": ${workDir}`);
+        logger.debug(`Follow-up using worktree for branch "${branchName}": ${workDir}`);
       }
     }
 
@@ -997,6 +1037,7 @@ Complete the pipeline step instructions above. Review the previous work and appl
         agentIds: effectiveAgentIds,
         artifactsDir: `${bmadArtifactsDir} (relative to project root)`,
         projectPath,
+        verboseMode: feature?.verboseCollaboration ?? false,
       });
     } else if (effectiveAgentIds && effectiveAgentIds.length === 1) {
       resolvedPersona = await this.bmadPersonaService.resolvePersona({
@@ -1155,7 +1196,7 @@ Address the follow-up instructions above. Review the previous work and make the 
       const maxThinkingTokens =
         resolvedPersona?.thinkingBudget ??
         this.thinkingLevelToMaxThinkingTokens(feature?.thinkingLevel);
-      console.log(`[AutoMode] Follow-up for feature ${featureId} using model: ${model}`);
+      logger.debug(`Follow-up for feature ${featureId} using model: ${model}`);
 
       // Update feature status to in_progress
       await this.updateFeatureStatus(projectPath, featureId, 'in_progress');
@@ -1180,7 +1221,7 @@ Address the follow-up instructions above. Review the previous work and make the 
             // Store the absolute path (external storage uses absolute paths)
             copiedImagePaths.push(destPath);
           } catch (error) {
-            console.error(`[AutoMode] Failed to copy follow-up image ${imagePath}:`, error);
+            logger.error(`Failed to copy follow-up image ${imagePath}:`, error);
           }
         }
       }
@@ -1216,7 +1257,7 @@ Address the follow-up instructions above. Review the previous work and make the 
         try {
           await secureFs.writeFile(featurePath, JSON.stringify(feature, null, 2));
         } catch (error) {
-          console.error(`[AutoMode] Failed to save feature.json:`, error);
+          logger.error(`Failed to save feature.json:`, error);
         }
       }
 
@@ -1347,10 +1388,10 @@ Address the follow-up instructions above. Review the previous work and make the 
       try {
         await secureFs.access(providedWorktreePath);
         workDir = providedWorktreePath;
-        console.log(`[AutoMode] Committing in provided worktree: ${workDir}`);
+        logger.debug(`Committing in provided worktree: ${workDir}`);
       } catch {
-        console.log(
-          `[AutoMode] Provided worktree path doesn't exist: ${providedWorktreePath}, using project path`
+        logger.debug(
+          `Provided worktree path doesn't exist: ${providedWorktreePath}, using project path`
         );
       }
     } else {
@@ -1359,9 +1400,9 @@ Address the follow-up instructions above. Review the previous work and make the 
       try {
         await secureFs.access(legacyWorktreePath);
         workDir = legacyWorktreePath;
-        console.log(`[AutoMode] Committing in legacy worktree: ${workDir}`);
+        logger.debug(`Committing in legacy worktree: ${workDir}`);
       } catch {
-        console.log(`[AutoMode] No worktree found, committing in project path: ${workDir}`);
+        logger.debug(`No worktree found, committing in project path: ${workDir}`);
       }
     }
 
@@ -1401,7 +1442,7 @@ Address the follow-up instructions above. Review the previous work and make the 
 
       return hash.trim();
     } catch (error) {
-      console.error(`[AutoMode] Commit failed for ${featureId}:`, error);
+      logger.error(`Commit failed for ${featureId}:`, error);
       return null;
     }
   }
@@ -1592,9 +1633,9 @@ Format your response as a structured markdown document.`;
     featureId: string,
     projectPath: string
   ): Promise<{ approved: boolean; editedPlan?: string; feedback?: string }> {
-    console.log(`[AutoMode] Registering pending approval for feature ${featureId}`);
-    console.log(
-      `[AutoMode] Current pending approvals: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
+    logger.info(`Registering pending approval for feature ${featureId}`);
+    logger.debug(
+      `Current pending approvals: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
     );
     return new Promise((resolve, reject) => {
       this.pendingApprovals.set(featureId, {
@@ -1603,7 +1644,7 @@ Format your response as a structured markdown document.`;
         featureId,
         projectPath,
       });
-      console.log(`[AutoMode] Pending approval registered for feature ${featureId}`);
+      logger.debug(`Pending approval registered for feature ${featureId}`);
     });
   }
 
@@ -1618,27 +1659,23 @@ Format your response as a structured markdown document.`;
     feedback?: string,
     projectPathFromClient?: string
   ): Promise<{ success: boolean; error?: string }> {
-    console.log(
-      `[AutoMode] resolvePlanApproval called for feature ${featureId}, approved=${approved}`
-    );
-    console.log(
-      `[AutoMode] Current pending approvals: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
+    logger.debug(`resolvePlanApproval called for feature ${featureId}, approved=${approved}`);
+    logger.debug(
+      `Current pending approvals: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
     );
     const pending = this.pendingApprovals.get(featureId);
 
     if (!pending) {
-      console.log(`[AutoMode] No pending approval in Map for feature ${featureId}`);
+      logger.debug(`No pending approval in Map for feature ${featureId}`);
 
       // RECOVERY: If no pending approval but we have projectPath from client,
       // check if feature's planSpec.status is 'generated' and handle recovery
       if (projectPathFromClient) {
-        console.log(`[AutoMode] Attempting recovery with projectPath: ${projectPathFromClient}`);
+        logger.debug(`Attempting recovery with projectPath: ${projectPathFromClient}`);
         const feature = await this.loadFeature(projectPathFromClient, featureId);
 
         if (feature?.planSpec?.status === 'generated') {
-          console.log(
-            `[AutoMode] Feature ${featureId} has planSpec.status='generated', performing recovery`
-          );
+          logger.debug(`Feature ${featureId} has planSpec.status='generated', performing recovery`);
 
           if (approved) {
             // Update planSpec to approved
@@ -1657,17 +1694,14 @@ Format your response as a structured markdown document.`;
             }
             continuationPrompt += `Now proceed with the implementation as specified in the plan:\n\n${planContent}\n\nImplement the feature now.`;
 
-            console.log(`[AutoMode] Starting recovery execution for feature ${featureId}`);
+            logger.debug(`Starting recovery execution for feature ${featureId}`);
 
             // Start feature execution with the continuation prompt (async, don't await)
             // Pass undefined for providedWorktreePath, use options for continuation prompt
             this.executeFeature(projectPathFromClient, featureId, true, false, undefined, {
               continuationPrompt,
             }).catch((error) => {
-              console.error(
-                `[AutoMode] Recovery execution failed for feature ${featureId}:`,
-                error
-              );
+              logger.error(`Recovery execution failed for feature ${featureId}:`, error);
             });
 
             return { success: true };
@@ -1691,15 +1725,13 @@ Format your response as a structured markdown document.`;
         }
       }
 
-      console.log(
-        `[AutoMode] ERROR: No pending approval found for feature ${featureId} and recovery not possible`
-      );
+      logger.error(`No pending approval found for feature ${featureId} and recovery not possible`);
       return {
         success: false,
         error: `No pending approval for feature ${featureId}`,
       };
     }
-    console.log(`[AutoMode] Found pending approval for feature ${featureId}, proceeding...`);
+    logger.debug(`Found pending approval for feature ${featureId}, proceeding...`);
 
     const { projectPath } = pending;
 
@@ -1732,17 +1764,17 @@ Format your response as a structured markdown document.`;
    * Cancel a pending plan approval (e.g., when feature is stopped).
    */
   cancelPlanApproval(featureId: string): void {
-    console.log(`[AutoMode] cancelPlanApproval called for feature ${featureId}`);
-    console.log(
-      `[AutoMode] Current pending approvals: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
+    logger.debug(`cancelPlanApproval called for feature ${featureId}`);
+    logger.debug(
+      `Current pending approvals: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
     );
     const pending = this.pendingApprovals.get(featureId);
     if (pending) {
-      console.log(`[AutoMode] Found and cancelling pending approval for feature ${featureId}`);
+      logger.debug(`Found and cancelling pending approval for feature ${featureId}`);
       pending.reject(new Error('Plan approval cancelled - feature was stopped'));
       this.pendingApprovals.delete(featureId);
     } else {
-      console.log(`[AutoMode] No pending approval to cancel for feature ${featureId}`);
+      logger.debug(`No pending approval to cancel for feature ${featureId}`);
     }
   }
 
@@ -1882,7 +1914,7 @@ Format your response as a structured markdown document.`;
       feature.updatedAt = new Date().toISOString();
       await secureFs.writeFile(featurePath, JSON.stringify(feature, null, 2));
     } catch (error) {
-      console.error(`[AutoMode] Failed to update planSpec for ${featureId}:`, error);
+      logger.error(`Failed to update planSpec for ${featureId}:`, error);
     }
   }
 
@@ -1905,9 +1937,7 @@ Format your response as a structured markdown document.`;
     questionsRemaining?: number;
     wizardComplete?: boolean;
   }> {
-    console.log(
-      `[AutoMode] submitWizardAnswer called for feature ${featureId}, question ${questionId}`
-    );
+    logger.debug(`submitWizardAnswer called for feature ${featureId}, question ${questionId}`);
 
     const pending = this.pendingWizardAnswers.get(featureId);
     if (!pending) {
@@ -1947,9 +1977,7 @@ Format your response as a structured markdown document.`;
     projectPath: string,
     questionId: string
   ): Promise<string | string[]> {
-    console.log(
-      `[AutoMode] Waiting for wizard answer for feature ${featureId}, question ${questionId}`
-    );
+    logger.debug(`Waiting for wizard answer for feature ${featureId}, question ${questionId}`);
     return new Promise((resolve, reject) => {
       this.pendingWizardAnswers.set(featureId, {
         resolve,
@@ -2016,7 +2044,7 @@ Format your response as a structured markdown document.`;
       feature.updatedAt = new Date().toISOString();
       await secureFs.writeFile(featurePath, JSON.stringify(feature, null, 2));
     } catch (error) {
-      console.error(`[AutoMode] Failed to update wizard state for ${featureId}:`, error);
+      logger.error(`Failed to update wizard state for ${featureId}:`, error);
     }
   }
 
@@ -2058,8 +2086,8 @@ Format your response as a structured markdown document.`;
         startedAt: new Date().toISOString(),
       });
     }
-    console.log(
-      `[AutoMode] Starting wizard loop for feature ${featureId}, ${questionsAsked} questions already asked`
+    logger.debug(
+      `Starting wizard loop for feature ${featureId}, ${questionsAsked} questions already asked`
     );
     while (!wizardComplete && questionsAsked < MAX_QUESTIONS) {
       if (abortController.signal.aborted) throw new Error('Wizard cancelled');
@@ -2078,11 +2106,9 @@ Format your response as a structured markdown document.`;
       if (turnResult.type === 'question') {
         const question = turnResult.question;
         questionsAsked++;
-        console.log(
-          `[AutoMode] Wizard Q${questionsAsked} for feature ${featureId}: ${question.id}`
-        );
-        console.log(
-          `[AutoMode] Emitting wizard question event: index=${questionsAsked - 1}, total=${MAX_QUESTIONS}`
+        logger.debug(`Wizard Q${questionsAsked} for feature ${featureId}: ${question.id}`);
+        logger.debug(
+          `Emitting wizard question event: index=${questionsAsked - 1}, total=${MAX_QUESTIONS}`
         );
         await this.updateFeatureWizardState(projectPath, featureId, {
           status: 'asking',
@@ -2098,24 +2124,22 @@ Format your response as a structured markdown document.`;
         });
         const answer = await this.waitForWizardAnswer(featureId, projectPath, question.id);
         answers[question.id] = answer;
-        console.log(`[AutoMode] Wizard answer for ${question.id}: ${JSON.stringify(answer)}`);
+        logger.debug(`Wizard answer for ${question.id}: ${JSON.stringify(answer)}`);
         const updatedFeature = await this.loadFeature(projectPath, featureId);
         if (updatedFeature) Object.assign(feature, updatedFeature);
       } else if (turnResult.type === 'complete') {
         if (questionsAsked < MIN_QUESTIONS) {
-          console.log(
-            `[AutoMode] Wizard tried to complete with only ${questionsAsked} questions (min ${MIN_QUESTIONS}), forcing another question`
+          logger.debug(
+            `Wizard tried to complete with only ${questionsAsked} questions (min ${MIN_QUESTIONS}), forcing another question`
           );
           continue;
         }
         wizardComplete = true;
-        console.log(
-          `[AutoMode] Wizard complete for feature ${featureId} after ${questionsAsked} questions`
-        );
+        logger.debug(`Wizard complete for feature ${featureId} after ${questionsAsked} questions`);
       }
     }
     if (questionsAsked >= MAX_QUESTIONS && !wizardComplete) {
-      console.log(`[AutoMode] Wizard hit max ${MAX_QUESTIONS} questions, forcing completion`);
+      logger.debug(`Wizard hit max ${MAX_QUESTIONS} questions, forcing completion`);
       wizardComplete = true;
     }
     await this.updateFeatureWizardState(projectPath, featureId, {
@@ -2207,7 +2231,7 @@ Format your response as a structured markdown document.`;
       abortController,
     };
 
-    console.log(`[AutoMode] Executing wizard turn for feature ${featureId}`);
+    logger.debug(`Executing wizard turn for feature ${featureId}`);
 
     const stream = provider.executeQuery(executeOptions);
     let responseText = '';
@@ -2223,9 +2247,7 @@ Format your response as a structured markdown document.`;
       }
     }
 
-    console.log(
-      `[AutoMode] Wizard turn response (${responseText.length} chars) for feature ${featureId}`
-    );
+    logger.debug(`Wizard turn response (${responseText.length} chars) for feature ${featureId}`);
 
     // Save wizard turn output to agent-output.md (append)
     const featureDir = getFeatureDir(projectPath, featureId);
@@ -2241,7 +2263,7 @@ Format your response as a structured markdown document.`;
       const separator = existing ? '\n\n---\n\n' : '';
       await secureFs.writeFile(outputPath, existing + separator + responseText);
     } catch (error) {
-      console.error(`[AutoMode] Failed to save wizard turn output:`, error);
+      logger.error(`Failed to save wizard turn output:`, error);
     }
 
     // Parse for [WIZARD_QUESTION] marker
@@ -2256,7 +2278,7 @@ Format your response as a structured markdown document.`;
           !questionPayload.question ||
           !Array.isArray(questionPayload.options)
         ) {
-          console.error(`[AutoMode] Invalid wizard question structure:`, questionPayload);
+          logger.error(`Invalid wizard question structure:`, questionPayload);
           throw new Error('Invalid question structure');
         }
 
@@ -2275,7 +2297,7 @@ Format your response as a structured markdown document.`;
           },
         };
       } catch (parseError) {
-        console.error(`[AutoMode] Failed to parse wizard question JSON:`, parseError);
+        logger.error(`Failed to parse wizard question JSON:`, parseError);
         // Fall through to complete check
       }
     }
@@ -2286,8 +2308,8 @@ Format your response as a structured markdown document.`;
     }
 
     // If no valid marker found, log warning and treat as needing more questions
-    console.warn(
-      `[AutoMode] Wizard turn produced no valid marker for feature ${featureId}, treating as needing more input`
+    logger.warn(
+      `Wizard turn produced no valid marker for feature ${featureId}, treating as needing more input`
     );
 
     // Return a fallback question asking for clarification
@@ -2776,7 +2798,7 @@ This helps parse your summary correctly in the output logs.`;
     // CI/CD Mock Mode: Return early with mock response when AUTOMAKER_MOCK_AGENT is set
     // This prevents actual API calls during automated testing
     if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
-      console.log(`[AutoMode] MOCK MODE: Skipping real agent execution for feature ${featureId}`);
+      logger.debug(`MOCK MODE: Skipping real agent execution for feature ${featureId}`);
 
       // Simulate some work being done
       await this.sleep(500);
@@ -2826,7 +2848,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       await secureFs.mkdir(path.dirname(outputPath), { recursive: true });
       await secureFs.writeFile(outputPath, mockOutput);
 
-      console.log(`[AutoMode] MOCK MODE: Completed mock execution for feature ${featureId}`);
+      logger.debug(`MOCK MODE: Completed mock execution for feature ${featureId}`);
       return;
     }
 
@@ -2870,8 +2892,8 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     const maxTurns = sdkOptions.maxTurns;
     const allowedTools = sdkOptions.allowedTools as string[] | undefined;
 
-    console.log(
-      `[AutoMode] runAgent called for feature ${featureId} with model: ${finalModel}, planningMode: ${planningMode}, requiresApproval: ${requiresApproval}`
+    logger.debug(
+      `runAgent called for feature ${featureId} with model: ${finalModel}, planningMode: ${planningMode}, requiresApproval: ${requiresApproval}`
     );
 
     // Execution model/provider (used for implementation tasks)
@@ -2894,8 +2916,8 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       ? ProviderFactory.getProviderForModel(plannerModel, this.settingsService ?? undefined)
       : executionProvider;
 
-    console.log(
-      `[AutoMode] Planning model: ${useSeparatePlanner ? plannerModel : executionModel} (provider "${planningProvider.getName()}"), execution model: ${executionModel} (provider "${executionProvider.getName()}")`
+    logger.debug(
+      `Planning model: ${useSeparatePlanner ? plannerModel : executionModel} (provider "${planningProvider.getName()}"), execution model: ${executionModel} (provider "${executionProvider.getName()}")`
     );
 
     // Build prompt content with images using utility
@@ -2908,9 +2930,17 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
 
     // Debug: Log if system prompt is provided
     if (options?.systemPrompt) {
-      console.log(
-        `[AutoMode] System prompt provided (${options.systemPrompt.length} chars), first 200 chars:\n${options.systemPrompt.substring(0, 200)}...`
+      const hasMultiAgent = options.systemPrompt.includes('# Multi-Agent Collaboration Mode');
+      const headerPos = options.systemPrompt.indexOf('# Multi-Agent Collaboration Mode');
+      logger.info(
+        `System prompt: ${options.systemPrompt.length} chars, ` +
+          `multi-agent: ${hasMultiAgent ? `YES (char ${headerPos})` : 'NO'}`
       );
+      if (hasMultiAgent && headerPos >= 0) {
+        logger.debug(
+          `Multi-agent header excerpt:\n${options.systemPrompt.substring(headerPos, headerPos + 150)}...`
+        );
+      }
     }
 
     const executeOptions: ExecuteOptions = {
@@ -2959,7 +2989,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     // Run wizard loop BEFORE main execution to gather requirements
     // ========================================
     if (planningMode === 'wizard') {
-      console.log(`[AutoMode] Running wizard loop for feature ${featureId}`);
+      logger.debug(`Running wizard loop for feature ${featureId}`);
 
       // Emit planning started event
       this.emitAutoModeEvent('planning_started', {
@@ -2988,8 +3018,8 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
         autoLoadClaudeMd,
       });
 
-      console.log(
-        `[AutoMode] Wizard complete with ${wizardResult.questionsAsked} questions, proceeding to plan generation`
+      logger.debug(
+        `Wizard complete with ${wizardResult.questionsAsked} questions, proceeding to plan generation`
       );
 
       // Build a new prompt that includes wizard answers for plan generation
@@ -3086,7 +3116,7 @@ Then proceed with implementation.
         await secureFs.writeFile(outputPath, responseText);
       } catch (error) {
         // Log but don't crash - file write errors shouldn't stop execution
-        console.error(`[AutoMode] Failed to write agent output for ${featureId}:`, error);
+        logger.error(`Failed to write agent output for ${featureId}:`, error);
       }
     };
 
@@ -3147,11 +3177,9 @@ Then proceed with implementation.
               let parsedTasks = parseTasksFromSpec(planContent);
               const tasksTotal = parsedTasks.length;
 
-              console.log(
-                `[AutoMode] Parsed ${tasksTotal} tasks from spec for feature ${featureId}`
-              );
+              logger.debug(`Parsed ${tasksTotal} tasks from spec for feature ${featureId}`);
               if (parsedTasks.length > 0) {
-                console.log(`[AutoMode] Tasks: ${parsedTasks.map((t) => t.id).join(', ')}`);
+                logger.debug(`Tasks: ${parsedTasks.map((t) => t.id).join(', ')}`);
               }
 
               // Update planSpec status to 'generated' and save content with parsed tasks
@@ -3180,8 +3208,8 @@ Then proceed with implementation.
                 let planApproved = false;
 
                 while (!planApproved) {
-                  console.log(
-                    `[AutoMode] Spec v${planVersion} generated for feature ${featureId}, waiting for approval`
+                  logger.debug(
+                    `Spec v${planVersion} generated for feature ${featureId}, waiting for approval`
                   );
 
                   // CRITICAL: Register pending approval BEFORE emitting event
@@ -3202,9 +3230,7 @@ Then proceed with implementation.
 
                     if (approvalResult.approved) {
                       // User approved the plan
-                      console.log(
-                        `[AutoMode] Plan v${planVersion} approved for feature ${featureId}`
-                      );
+                      logger.debug(`Plan v${planVersion} approved for feature ${featureId}`);
                       planApproved = true;
 
                       // If user provided edits, use the edited version
@@ -3236,15 +3262,15 @@ Then proceed with implementation.
 
                       if (!hasFeedback && !hasEdits) {
                         // No feedback or edits = explicit cancel
-                        console.log(
-                          `[AutoMode] Plan rejected without feedback for feature ${featureId}, cancelling`
+                        logger.debug(
+                          `Plan rejected without feedback for feature ${featureId}, cancelling`
                         );
                         throw new Error('Plan cancelled by user');
                       }
 
                       // User wants revisions - regenerate the plan
-                      console.log(
-                        `[AutoMode] Plan v${planVersion} rejected with feedback for feature ${featureId}, regenerating...`
+                      logger.debug(
+                        `Plan v${planVersion} rejected with feedback for feature ${featureId}, regenerating...`
                       );
                       planVersion++;
 
@@ -3328,7 +3354,7 @@ After generating the revised spec, output:
 
                       // Re-parse tasks from revised plan
                       const revisedTasks = parseTasksFromSpec(currentPlanContent);
-                      console.log(`[AutoMode] Revised plan has ${revisedTasks.length} tasks`);
+                      logger.debug(`Revised plan has ${revisedTasks.length} tasks`);
 
                       // Update planSpec with revised content
                       await this.updateFeaturePlanSpec(projectPath, featureId, {
@@ -3354,8 +3380,8 @@ After generating the revised spec, output:
                 }
               } else {
                 // Auto-approve: requirePlanApproval is false, just continue without pausing
-                console.log(
-                  `[AutoMode] Spec generated for feature ${featureId}, auto-approving (requirePlanApproval=false)`
+                logger.debug(
+                  `Spec generated for feature ${featureId}, auto-approving (requirePlanApproval=false)`
                 );
 
                 // Emit info event for frontend
@@ -3371,9 +3397,7 @@ After generating the revised spec, output:
 
               // CRITICAL: After approval, we need to make a second call to continue implementation
               // The agent is waiting for "approved" - we need to send it and continue
-              console.log(
-                `[AutoMode] Making continuation call after plan approval for feature ${featureId}`
-              );
+              logger.debug(`Making continuation call after plan approval for feature ${featureId}`);
 
               // Update planSpec status to approved (handles both manual and auto-approval paths)
               await this.updateFeaturePlanSpec(projectPath, featureId, {
@@ -3388,8 +3412,8 @@ After generating the revised spec, output:
               // ========================================
 
               if (parsedTasks.length > 0) {
-                console.log(
-                  `[AutoMode] Starting multi-agent execution: ${parsedTasks.length} tasks for feature ${featureId}`
+                logger.debug(
+                  `Starting multi-agent execution: ${parsedTasks.length} tasks for feature ${featureId}`
                 );
 
                 // Execute each task with a separate agent
@@ -3402,7 +3426,7 @@ After generating the revised spec, output:
                   }
 
                   // Emit task started
-                  console.log(`[AutoMode] Starting task ${task.id}: ${task.description}`);
+                  logger.debug(`Starting task ${task.id}: ${task.description}`);
                   this.emitAutoModeEvent('auto_mode_task_started', {
                     featureId,
                     projectPath,
@@ -3469,7 +3493,7 @@ After generating the revised spec, output:
                   }
 
                   // Emit task completed
-                  console.log(`[AutoMode] Task ${task.id} completed for feature ${featureId}`);
+                  logger.debug(`Task ${task.id} completed for feature ${featureId}`);
                   this.emitAutoModeEvent('auto_mode_task_complete', {
                     featureId,
                     projectPath,
@@ -3500,13 +3524,11 @@ After generating the revised spec, output:
                   }
                 }
 
-                console.log(
-                  `[AutoMode] All ${parsedTasks.length} tasks completed for feature ${featureId}`
-                );
+                logger.debug(`All ${parsedTasks.length} tasks completed for feature ${featureId}`);
               } else {
                 // No parsed tasks - fall back to single-agent execution
-                console.log(
-                  `[AutoMode] No parsed tasks, using single-agent execution for feature ${featureId}`
+                logger.debug(
+                  `No parsed tasks, using single-agent execution for feature ${featureId}`
                 );
 
                 const continuationPrompt = `The plan/specification has been approved. Now implement it.
@@ -3556,7 +3578,7 @@ Implement all the changes described in the plan above.`;
                 }
               }
 
-              console.log(`[AutoMode] Implementation completed for feature ${featureId}`);
+              logger.info(`Implementation completed for feature ${featureId}`);
               // Exit the original stream loop since continuation is done
               break streamLoop;
             }

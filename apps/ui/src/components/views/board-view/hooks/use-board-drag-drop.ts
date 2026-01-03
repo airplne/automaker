@@ -4,6 +4,7 @@ import { Feature } from '@/store/app-store';
 import { useAppStore } from '@/store/app-store';
 import { toast } from 'sonner';
 import { COLUMNS, ColumnId } from '../constants';
+import type { FeatureStatusWithPipeline } from '@automaker/types';
 
 const isColumnId = (value: unknown): value is ColumnId =>
   value === 'backlog' ||
@@ -75,7 +76,7 @@ export function useBoardDragDrop({
         }
       }
 
-      let targetStatus: ColumnId | null = null;
+      let targetStatus: FeatureStatusWithPipeline | null = null;
 
       // Check if we dropped on a column
       const column = COLUMNS.find((c) => c.id === overId);

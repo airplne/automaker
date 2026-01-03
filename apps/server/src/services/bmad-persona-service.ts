@@ -9,21 +9,50 @@ import type { PersonaDescriptor, ResolvedPersona, ResolvedAgentCollab } from '@a
 
 /**
  * Public-facing persona IDs exposed in the UI.
- * Only the executive personas plus party-synthesis are shown to users.
- * Other personas remain resolvable for backward compatibility with saved Feature cards.
+ * All 29 BMAD agents + party-synthesis (30 total).
  */
 const PUBLIC_PERSONA_IDS = [
+  // Special synthesis mode
   'bmad:party-synthesis',
+
+  // Core (1)
+  'bmad:bmad-master',
+
+  // Builders (3)
+  'bmad:agent-builder',
+  'bmad:module-builder',
+  'bmad:workflow-builder',
+
+  // Method (9)
+  'bmad:analyst',
+  'bmad:architect',
+  'bmad:dev',
+  'bmad:pm',
+  'bmad:quick-flow-solo-dev',
+  'bmad:sm',
+  'bmad:tea',
+  'bmad:tech-writer',
+  'bmad:ux-designer',
+
+  // Executive (10)
   'bmad:strategist-marketer',
   'bmad:technologist-architect',
   'bmad:fulfillization-manager',
   'bmad:security-guardian',
-  'bmad:analyst-strategist',
   'bmad:financial-strategist',
   'bmad:operations-commander',
   'bmad:apex',
   'bmad:zen',
   'bmad:echon',
+  'bmad:marketing-outreach', // Petal
+
+  // Creative (6)
+  'bmad:brainstorming-coach',
+  'bmad:creative-problem-solver',
+  'bmad:design-thinking-coach',
+  'bmad:innovation-strategist',
+  'bmad:presentation-master',
+  'bmad:storyteller',
 ] as const;
 
 type AgentManifestRow = {
@@ -156,10 +185,9 @@ export class BmadPersonaService {
           `Simulate a short internal deliberation between the 10 executive personas:`,
           `- Sage (strategist-marketer): Business WHY/WHO, product strategy, requirements`,
           `- Theo (technologist-architect): Technical HOW, architecture, implementation`,
-          `- Finn (fulfillization-manager): SHIP + UX/docs/ops + end-user experience`,
+          `- Finn (fulfillization-manager): Lead Arrival Executor - vision to reality orchestration`,
           `- Cerberus (security-guardian): Security posture, risk assessment, supply chain`,
-          `- Mary (analyst-strategist): Research, analysis, requirements elicitation`,
-          `- Walt (financial-strategist): Financial planning, ROI, resource allocation`,
+          `- Stermark (financial-strategist): Financial planning, ROI, resource allocation`,
           `- Axel (operations-commander): Operations, process optimization, delivery`,
           `- Apex (apex): Peak performance engineering, optimization, rapid implementation`,
           `- Zen (zen): Clean architecture, maintainability, refactoring, test strategy`,
@@ -218,6 +246,7 @@ export class BmadPersonaService {
     agentIds?: string[];
     artifactsDir?: string;
     projectPath?: string;
+    verboseMode?: boolean;
   }): Promise<ResolvedAgentCollab | null> {
     const agentIds = params.agentIds?.filter(Boolean);
     if (!agentIds || agentIds.length === 0) return null;
@@ -241,7 +270,7 @@ export class BmadPersonaService {
     );
 
     // Build combined prompt for sequential collaboration
-    const combinedSystemPrompt = this.buildCollaborativePrompt(agents);
+    const combinedSystemPrompt = this.buildCollaborativePrompt(agents, params.verboseMode ?? false);
 
     // Use lead agent's defaults
     const leadDefaults = this.getAgentDefaults(agentIds[0]);
@@ -299,10 +328,68 @@ export class BmadPersonaService {
   }
 
   private buildCollaborativePrompt(
-    agents: Array<{ id: string; name: string; icon: string; systemPrompt: string }>
+    agents: Array<{ id: string; name: string; icon: string; systemPrompt: string }>,
+    verboseMode = false
   ): string {
     if (agents.length === 1) {
       return agents[0].systemPrompt;
+    }
+
+    if (verboseMode) {
+      const agentRoster = agents.map((a, i) => `${i + 1}. ${a.icon} **${a.name}**`).join('\n');
+      const agentContexts = agents
+        .map((a, i) => `### Agent ${i + 1}: ${a.name}\n${a.systemPrompt}`)
+        .join('\n\n');
+
+      const agentOutputSections = agents
+        .map((a, i) => {
+          if (i === 0) {
+            return `<agent name="${a.name}" icon="${a.icon}" role="lead">
+[Provide ${a.name}'s comprehensive analysis and recommendations as the lead agent]
+</agent>`;
+          } else {
+            return `<agent name="${a.name}" icon="${a.icon}">
+[Provide ${a.name}'s perspective, additions, concerns, or specific expertise]
+</agent>`;
+          }
+        })
+        .join('\n\n');
+
+      return `# Multi-Agent Collaboration Mode (Verbose)
+
+You are operating in **verbose collaborative mode** with ${agents.length} BMAD agents. Each agent will provide their explicit perspective.
+
+## Agent Team
+${agentRoster}
+
+## Collaboration Protocol
+1. Consider the task from each agent's perspective sequentially
+2. ${agents[0].name} leads the analysis
+3. Each subsequent agent provides their unique expertise
+4. Clearly identify any trade-offs or disagreements
+5. End with a synthesized recommendation
+
+## Agent Contexts
+${agentContexts}
+
+## Output Format (REQUIRED)
+
+Structure your response with explicit XML-tagged sections for EACH agent:
+
+${agentOutputSections}
+
+<synthesis>
+[Synthesized recommendation combining all agent perspectives and acknowledging trade-offs]
+</synthesis>
+
+**CRITICAL REQUIREMENTS:**
+- Every agent must have substantive content in their section (2-5 sentences minimum)
+- Use the exact XML tag format shown above
+- Include agent name and icon in opening tags
+- Do not skip agents or provide empty sections
+- Synthesis must reference specific agent inputs
+
+---`;
     }
 
     const agentRoster = agents.map((a, i) => `${i + 1}. ${a.icon} **${a.name}**`).join('\n');
@@ -340,45 +427,56 @@ When responding:
 
   private getAgentDefaults(personaId: string): { model?: string; thinkingBudget?: number } {
     const defaults: Record<string, { model: string; thinkingBudget: number }> = {
-      // Strategic/analytical roles - more thinking
-      'bmad:architect': { model: 'sonnet', thinkingBudget: 12000 },
-      'bmad:pm': { model: 'sonnet', thinkingBudget: 10000 },
-      'bmad:analyst': { model: 'sonnet', thinkingBudget: 10000 },
-      'bmad:innovation-strategist': { model: 'sonnet', thinkingBudget: 10000 },
+      // ============================================================
+      // CORE MODULE (1 agent)
+      // ============================================================
+      'bmad:bmad-master': { model: 'opus', thinkingBudget: 16000 },
 
-      // Implementation roles - balanced
-      'bmad:dev': { model: 'sonnet', thinkingBudget: 8000 },
-      'bmad:sm': { model: 'sonnet', thinkingBudget: 6000 },
-      'bmad:tea': { model: 'sonnet', thinkingBudget: 8000 },
+      // ============================================================
+      // BUILDERS MODULE (3 agents)
+      // ============================================================
+      'bmad:agent-builder': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:module-builder': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:workflow-builder': { model: 'opus', thinkingBudget: 16000 },
 
-      // Quick execution roles
-      'bmad:quick-flow-solo-dev': { model: 'sonnet', thinkingBudget: 5000 },
+      // ============================================================
+      // METHOD MODULE (9 agents)
+      // ============================================================
+      'bmad:analyst': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:architect': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:dev': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:pm': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:quick-flow-solo-dev': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:sm': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:tea': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:tech-writer': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:ux-designer': { model: 'opus', thinkingBudget: 16000 },
 
-      // Creative roles
-      'bmad:ux-designer': { model: 'sonnet', thinkingBudget: 8000 },
-      'bmad:storyteller': { model: 'sonnet', thinkingBudget: 8000 },
-      'bmad:brainstorming-coach': { model: 'sonnet', thinkingBudget: 8000 },
+      // ============================================================
+      // EXECUTIVE MODULE (10 agents)
+      // ============================================================
+      'bmad:strategist-marketer': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:technologist-architect': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:fulfillization-manager': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:security-guardian': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:financial-strategist': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:operations-commander': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:apex': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:zen': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:echon': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:marketing-outreach': { model: 'opus', thinkingBudget: 10000 },
 
-      // Builder roles
-      'bmad:agent-builder': { model: 'sonnet', thinkingBudget: 8000 },
-      'bmad:module-builder': { model: 'sonnet', thinkingBudget: 8000 },
-      'bmad:workflow-builder': { model: 'sonnet', thinkingBudget: 8000 },
-
-      // Executive personas - BMM framework roles
-      'bmad:strategist-marketer': { model: 'sonnet', thinkingBudget: 10000 },
-      'bmad:technologist-architect': { model: 'sonnet', thinkingBudget: 12000 },
-      'bmad:fulfillization-manager': { model: 'sonnet', thinkingBudget: 9000 },
-
-      // Executive Suite - new agents
-      'bmad:security-guardian': { model: 'sonnet', thinkingBudget: 10000 },
-      'bmad:analyst-strategist': { model: 'sonnet', thinkingBudget: 10000 },
-      'bmad:financial-strategist': { model: 'sonnet', thinkingBudget: 10000 },
-      'bmad:operations-commander': { model: 'sonnet', thinkingBudget: 9000 },
-      'bmad:apex': { model: 'sonnet', thinkingBudget: 9000 },
-      'bmad:zen': { model: 'sonnet', thinkingBudget: 10000 },
-      'bmad:echon': { model: 'sonnet', thinkingBudget: 10000 },
+      // ============================================================
+      // CREATIVE MODULE (6 agents)
+      // ============================================================
+      'bmad:brainstorming-coach': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:creative-problem-solver': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:design-thinking-coach': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:innovation-strategist': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:presentation-master': { model: 'opus', thinkingBudget: 16000 },
+      'bmad:storyteller': { model: 'opus', thinkingBudget: 16000 },
     };
 
-    return defaults[personaId] || { model: 'sonnet', thinkingBudget: 8000 };
+    return defaults[personaId] || { model: 'opus', thinkingBudget: 16000 };
   }
 }

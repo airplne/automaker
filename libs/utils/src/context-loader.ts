@@ -11,6 +11,9 @@
 
 import path from 'path';
 import fs from 'fs/promises';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('ContextLoader');
 
 /**
  * Metadata structure for context files
@@ -184,15 +187,13 @@ export async function loadContextFiles(
           description: metadata.files[fileName]?.description,
         });
       } catch (error) {
-        console.warn(`[ContextLoader] Failed to read context file ${fileName}:`, error);
+        logger.warn(`Failed to read context file ${fileName}:`, error);
       }
     }
 
     const formattedPrompt = buildContextPrompt(files);
 
-    console.log(
-      `[ContextLoader] Loaded ${files.length} context file(s): ${files.map((f) => f.name).join(', ')}`
-    );
+    logger.debug(`Loaded ${files.length} context file(s): ${files.map((f) => f.name).join(', ')}`);
 
     return { files, formattedPrompt };
   } catch {

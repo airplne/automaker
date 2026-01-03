@@ -29,8 +29,9 @@ function RootLayoutContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { openFileBrowser } = useFileBrowser();
 
-  // Listen for npm security approval events
-  useNpmSecurityEvents();
+  // Listen for npm security approval events (disabled on login page)
+  const isLoginRoute = location.pathname === '/login';
+  useNpmSecurityEvents({ disabled: isLoginRoute });
 
   // Hidden streamer panel - opens with "\" key
   const handleStreamerPanelShortcut = useCallback((event: KeyboardEvent) => {
@@ -94,6 +95,19 @@ function RootLayoutContent() {
           return;
         }
 
+        // Skip session verification if already on login page
+        if (isLoginRoute) {
+          setIsAuthenticated(false);
+          setAuthChecked(true);
+          return;
+        }
+
+        // Avoid re-checking auth after it has already succeeded.
+        // This prevents noisy repeated auth calls during normal navigation in web mode.
+        if (authChecked && isAuthenticated) {
+          return;
+        }
+
         // In web mode, verify the session cookie is still valid
         // by making a request to an authenticated endpoint
         const isValid = await verifySession();
@@ -123,7 +137,7 @@ function RootLayoutContent() {
     };
 
     initAuth();
-  }, [location.pathname, navigate]);
+  }, [navigate, isLoginRoute, authChecked, isAuthenticated]);
 
   // Wait for setup store hydration before enforcing routing rules
   useEffect(() => {
@@ -147,19 +161,45 @@ function RootLayoutContent() {
   useEffect(() => {
     if (!setupHydrated) return;
 
+    // In web mode, /login must win over the setup wizard; otherwise we can bounce between
+    // /login <-> /setup and spam authenticated endpoints with 401s.
+    if (isLoginRoute) return;
+
+    // In web mode, do not enforce setup routing until auth is settled and the user is authenticated.
+    // This prevents route churn (/ -> /setup -> /login -> /setup ...) which can repeatedly trigger
+    // verifySession() calls and spam the server logs with 401 + logout traffic.
+    if (!isElectronMode()) {
+      if (!authChecked) return;
+      if (!isAuthenticated) return;
+    }
+
     if (!setupComplete && location.pathname !== '/setup') {
       navigate({ to: '/setup' });
     } else if (setupComplete && location.pathname === '/setup') {
       navigate({ to: '/' });
     }
-  }, [setupComplete, setupHydrated, location.pathname, navigate]);
+  }, [
+    setupComplete,
+    setupHydrated,
+    location.pathname,
+    navigate,
+    isLoginRoute,
+    authChecked,
+    isAuthenticated,
+  ]);
 
   useEffect(() => {
     setGlobalFileBrowser(openFileBrowser);
   }, [openFileBrowser]);
 
-  // Test IPC connection on mount
+  // Test IPC connection on mount (skip on login page to avoid auth errors)
   useEffect(() => {
+    // Don't test IPC connection on login page
+    if (isLoginRoute) {
+      setIpcConnected(false);
+      return;
+    }
+
     const testConnection = async () => {
       try {
         const api = getElectronAPI();
@@ -172,14 +212,19 @@ function RootLayoutContent() {
     };
 
     testConnection();
-  }, [setIpcConnected]);
+  }, [setIpcConnected, isLoginRoute]);
 
   // Restore to board view if a project was previously open
   useEffect(() => {
+    // In web mode, don't auto-redirect until authenticated to avoid route churn and auth spam.
+    if (!isElectronMode() && (!authChecked || !isAuthenticated)) {
+      return;
+    }
+
     if (isMounted && currentProject && location.pathname === '/') {
       navigate({ to: '/board' });
     }
-  }, [isMounted, currentProject, location.pathname, navigate]);
+  }, [isMounted, currentProject, location.pathname, navigate, authChecked, isAuthenticated]);
 
   // Apply theme class to document - use deferred value to avoid blocking UI
   useEffect(() => {
@@ -204,7 +249,7 @@ function RootLayoutContent() {
 
   // Login and setup views are full-screen without sidebar
   const isSetupRoute = location.pathname === '/setup';
-  const isLoginRoute = location.pathname === '/login';
+  // isLoginRoute already declared above for hook guards
 
   // Show login page (full screen, no sidebar)
   if (isLoginRoute) {

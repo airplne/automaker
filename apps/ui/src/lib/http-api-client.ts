@@ -89,16 +89,22 @@ export const initApiKey = async (): Promise<void> => {
     try {
       cachedApiKey = await window.electronAPI.getApiKey();
       if (cachedApiKey) {
-        console.log('[HTTP Client] Using API key from Electron');
+        if (import.meta.env.DEV) {
+          console.log('[HTTP Client] Using API key from Electron');
+        }
         return;
       }
     } catch (error) {
-      console.warn('[HTTP Client] Failed to get API key from Electron:', error);
+      if (import.meta.env.DEV) {
+        console.warn('[HTTP Client] Failed to get API key from Electron:', error);
+      }
     }
   }
 
   // In web mode, authentication is handled via HTTP-only cookies
-  console.log('[HTTP Client] Web mode - using cookie-based authentication');
+  if (import.meta.env.DEV) {
+    console.log('[HTTP Client] Web mode - using cookie-based authentication');
+  }
 };
 
 /**
@@ -119,7 +125,9 @@ export const checkAuthStatus = async (): Promise<{
       required: data.required ?? true,
     };
   } catch (error) {
-    console.error('[HTTP Client] Failed to check auth status:', error);
+    if (import.meta.env.DEV) {
+      console.error('[HTTP Client] Failed to check auth status:', error);
+    }
     return { authenticated: false, required: true };
   }
 };
@@ -144,23 +152,31 @@ export const login = async (
     // Store the session token if login succeeded
     if (data.success && data.token) {
       setSessionToken(data.token);
-      console.log('[HTTP Client] Session token stored after login');
+      if (import.meta.env.DEV) {
+        console.log('[HTTP Client] Session token stored after login');
+      }
 
       // Verify the session is actually working by making a request to an authenticated endpoint
       const verified = await verifySession();
       if (!verified) {
-        console.error('[HTTP Client] Login appeared successful but session verification failed');
+        if (import.meta.env.DEV) {
+          console.error('[HTTP Client] Login appeared successful but session verification failed');
+        }
         return {
           success: false,
           error: 'Session verification failed. Please try again.',
         };
       }
-      console.log('[HTTP Client] Login verified successfully');
+      if (import.meta.env.DEV) {
+        console.log('[HTTP Client] Login verified successfully');
+      }
     }
 
     return data;
   } catch (error) {
-    console.error('[HTTP Client] Login failed:', error);
+    if (import.meta.env.DEV) {
+      console.error('[HTTP Client] Login failed:', error);
+    }
     return { success: false, error: 'Network error' };
   }
 };
@@ -180,20 +196,28 @@ export const fetchSessionToken = async (): Promise<boolean> => {
     });
 
     if (!response.ok) {
-      console.log('[HTTP Client] Failed to check auth status');
+      if (import.meta.env.DEV) {
+        console.log('[HTTP Client] Failed to check auth status');
+      }
       return false;
     }
 
     const data = await response.json();
     if (data.success && data.authenticated) {
-      console.log('[HTTP Client] Session cookie is valid');
+      if (import.meta.env.DEV) {
+        console.log('[HTTP Client] Session cookie is valid');
+      }
       return true;
     }
 
-    console.log('[HTTP Client] Session cookie is not authenticated');
+    if (import.meta.env.DEV) {
+      console.log('[HTTP Client] Session cookie is not authenticated');
+    }
     return false;
   } catch (error) {
-    console.error('[HTTP Client] Failed to check session:', error);
+    if (import.meta.env.DEV) {
+      console.error('[HTTP Client] Failed to check session:', error);
+    }
     return false;
   }
 };
@@ -206,31 +230,50 @@ export const logout = async (): Promise<{ success: boolean }> => {
     const response = await fetch(`${getServerUrl()}/api/auth/logout`, {
       method: 'POST',
       credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
     // Clear the cached session token
     clearSessionToken();
-    console.log('[HTTP Client] Session token cleared on logout');
+    if (import.meta.env.DEV) {
+      console.log('[HTTP Client] Session token cleared on logout');
+    }
 
     return await response.json();
   } catch (error) {
-    console.error('[HTTP Client] Logout failed:', error);
+    if (import.meta.env.DEV) {
+      console.error('[HTTP Client] Logout failed:', error);
+    }
     return { success: false };
   }
 };
 
 /**
- * Verify that the current session is still valid by making a request to an authenticated endpoint.
- * If the session has expired or is invalid, clears the session and returns false.
+ * Verify that the current session is still valid.
+ * Uses the lightweight `/api/auth/status` endpoint (no 401 spam) to confirm cookie/header auth.
+ * If the session is invalid, clears the cached session token and returns false.
  * This should be called:
  * 1. After login to verify the cookie was set correctly
  * 2. On app load to verify the session hasn't expired
  */
+let verifySessionInFlight: Promise<boolean> | null = null;
+let lastVerifySessionAt = 0;
+let lastVerifySessionResult: boolean | null = null;
+const VERIFY_SESSION_DEDUP_MS = 2000;
+
 export const verifySession = async (): Promise<boolean> => {
-  try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+  const now = Date.now();
+
+  if (verifySessionInFlight) return verifySessionInFlight;
+  if (lastVerifySessionResult !== null && now - lastVerifySessionAt < VERIFY_SESSION_DEDUP_MS) {
+    return lastVerifySessionResult;
+  }
+
+  verifySessionInFlight = (async () => {
+    // Avoid sending Content-Type on GET to prevent unnecessary CORS preflights in web mode.
+    const headers: Record<string, string> = {};
 
     // Add session token header if available
     const sessionToken = getSessionToken();
@@ -238,37 +281,50 @@ export const verifySession = async (): Promise<boolean> => {
       headers['X-Session-Token'] = sessionToken;
     }
 
-    // Make a request to an authenticated endpoint to verify the session
-    // We use /api/settings/status as it requires authentication and is lightweight
-    const response = await fetch(`${getServerUrl()}/api/settings/status`, {
+    // Use /api/auth/status so an unauthenticated request returns 200 with { authenticated: false }
+    // rather than 401, which can flood server request logs during route churn or startup.
+    const response = await fetch(`${getServerUrl()}/api/auth/status`, {
       headers,
       credentials: 'include',
     });
 
-    // Check for authentication errors
-    if (response.status === 401 || response.status === 403) {
-      console.warn('[HTTP Client] Session verification failed - session expired or invalid');
-      // Clear the session since it's no longer valid
-      clearSessionToken();
-      // Try to clear the cookie via logout (fire and forget)
-      fetch(`${getServerUrl()}/api/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      }).catch(() => {});
-      return false;
-    }
-
     if (!response.ok) {
-      console.warn('[HTTP Client] Session verification failed with status:', response.status);
-      return false;
+      if (import.meta.env.DEV) {
+        console.warn('[HTTP Client] Session verification failed with status:', response.status);
+      }
+      return false as const;
     }
 
-    console.log('[HTTP Client] Session verified successfully');
-    return true;
-  } catch (error) {
-    console.error('[HTTP Client] Session verification error:', error);
-    return false;
-  }
+    const data = (await response.json()) as { success?: boolean; authenticated?: boolean };
+    const isAuthenticated = !!(data?.success && data?.authenticated);
+
+    if (!isAuthenticated) {
+      clearSessionToken();
+      if (import.meta.env.DEV) {
+        console.warn('[HTTP Client] Session is not authenticated');
+      }
+      return false as const;
+    }
+
+    if (import.meta.env.DEV) {
+      console.log('[HTTP Client] Session verified successfully');
+    }
+    return true as const;
+  })()
+    .catch((error) => {
+      if (import.meta.env.DEV) {
+        console.error('[HTTP Client] Session verification error:', error);
+      }
+      return false;
+    })
+    .finally(() => {
+      verifySessionInFlight = null;
+    });
+
+  const result = await verifySessionInFlight;
+  lastVerifySessionAt = now;
+  lastVerifySessionResult = result;
+  return result;
 };
 
 type EventType =
@@ -308,9 +364,8 @@ export class HttpApiClient implements ElectronAPI {
    */
   private async fetchWsToken(): Promise<string | null> {
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
+      // Avoid sending Content-Type on GET to prevent unnecessary CORS preflights in web mode.
+      const headers: Record<string, string> = {};
 
       // Add session token header if available
       const sessionToken = getSessionToken();
@@ -324,7 +379,9 @@ export class HttpApiClient implements ElectronAPI {
       });
 
       if (!response.ok) {
-        console.warn('[HttpApiClient] Failed to fetch wsToken:', response.status);
+        if (import.meta.env.DEV) {
+          console.warn('[HttpApiClient] Failed to fetch wsToken:', response.status);
+        }
         return null;
       }
 
@@ -335,7 +392,9 @@ export class HttpApiClient implements ElectronAPI {
 
       return null;
     } catch (error) {
-      console.error('[HttpApiClient] Error fetching wsToken:', error);
+      if (import.meta.env.DEV) {
+        console.error('[HttpApiClient] Error fetching wsToken:', error);
+      }
       return null;
     }
   }
@@ -363,12 +422,16 @@ export class HttpApiClient implements ElectronAPI {
           this.establishWebSocket(`${wsUrl}?wsToken=${encodeURIComponent(wsToken)}`);
         } else {
           // Fallback: try connecting without token (will fail if not authenticated)
-          console.warn('[HttpApiClient] No wsToken available, attempting connection anyway');
+          if (import.meta.env.DEV) {
+            console.warn('[HttpApiClient] No wsToken available, attempting connection anyway');
+          }
           this.establishWebSocket(wsUrl);
         }
       })
       .catch((error) => {
-        console.error('[HttpApiClient] Failed to prepare WebSocket connection:', error);
+        if (import.meta.env.DEV) {
+          console.error('[HttpApiClient] Failed to prepare WebSocket connection:', error);
+        }
         this.isConnecting = false;
       });
   }
@@ -381,7 +444,9 @@ export class HttpApiClient implements ElectronAPI {
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('[HttpApiClient] WebSocket connected');
+        if (import.meta.env.DEV) {
+          console.log('[HttpApiClient] WebSocket connected');
+        }
         this.isConnecting = false;
         if (this.reconnectTimer) {
           clearTimeout(this.reconnectTimer);
@@ -397,12 +462,16 @@ export class HttpApiClient implements ElectronAPI {
             callbacks.forEach((cb) => cb(data.payload));
           }
         } catch (error) {
-          console.error('[HttpApiClient] Failed to parse WebSocket message:', error);
+          if (import.meta.env.DEV) {
+            console.error('[HttpApiClient] Failed to parse WebSocket message:', error);
+          }
         }
       };
 
       this.ws.onclose = () => {
-        console.log('[HttpApiClient] WebSocket disconnected');
+        if (import.meta.env.DEV) {
+          console.log('[HttpApiClient] WebSocket disconnected');
+        }
         this.isConnecting = false;
         this.ws = null;
         // Attempt to reconnect after 5 seconds
@@ -415,11 +484,15 @@ export class HttpApiClient implements ElectronAPI {
       };
 
       this.ws.onerror = (error) => {
-        console.error('[HttpApiClient] WebSocket error:', error);
+        if (import.meta.env.DEV) {
+          console.error('[HttpApiClient] WebSocket error:', error);
+        }
         this.isConnecting = false;
       };
     } catch (error) {
-      console.error('[HttpApiClient] Failed to create WebSocket:', error);
+      if (import.meta.env.DEV) {
+        console.error('[HttpApiClient] Failed to create WebSocket:', error);
+      }
       this.isConnecting = false;
     }
   }
@@ -441,10 +514,12 @@ export class HttpApiClient implements ElectronAPI {
     };
   }
 
-  private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+  private getHeaders(options?: { includeContentType?: boolean }): Record<string, string> {
+    const headers: Record<string, string> = {};
+
+    if (options?.includeContentType !== false) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     // Electron mode: use API key
     const apiKey = getApiKey();
@@ -474,7 +549,7 @@ export class HttpApiClient implements ElectronAPI {
 
   private async get<T>(endpoint: string): Promise<T> {
     const response = await fetch(`${this.serverUrl}${endpoint}`, {
-      headers: this.getHeaders(),
+      headers: this.getHeaders({ includeContentType: false }),
       credentials: 'include', // Include cookies for session auth
     });
     return response.json();
@@ -493,7 +568,7 @@ export class HttpApiClient implements ElectronAPI {
   private async httpDelete<T>(endpoint: string): Promise<T> {
     const response = await fetch(`${this.serverUrl}${endpoint}`, {
       method: 'DELETE',
-      headers: this.getHeaders(),
+      headers: this.getHeaders({ includeContentType: false }),
       credentials: 'include', // Include cookies for session auth
     });
     return response.json();
@@ -555,7 +630,9 @@ export class HttpApiClient implements ElectronAPI {
     const fileBrowser = getGlobalFileBrowser();
 
     if (!fileBrowser) {
-      console.error('File browser not initialized');
+      if (import.meta.env.DEV) {
+        console.error('File browser not initialized');
+      }
       return { canceled: true, filePaths: [] };
     }
 
@@ -576,7 +653,9 @@ export class HttpApiClient implements ElectronAPI {
       return { canceled: false, filePaths: [result.path] };
     }
 
-    console.error('Invalid directory:', result.error);
+    if (import.meta.env.DEV) {
+      console.error('Invalid directory:', result.error);
+    }
     return { canceled: true, filePaths: [] };
   }
 
@@ -584,7 +663,9 @@ export class HttpApiClient implements ElectronAPI {
     const fileBrowser = getGlobalFileBrowser();
 
     if (!fileBrowser) {
-      console.error('File browser not initialized');
+      if (import.meta.env.DEV) {
+        console.error('File browser not initialized');
+      }
       return { canceled: true, filePaths: [] };
     }
 
@@ -603,7 +684,9 @@ export class HttpApiClient implements ElectronAPI {
       return { canceled: false, filePaths: [path] };
     }
 
-    console.error('File not found');
+    if (import.meta.env.DEV) {
+      console.error('File not found');
+    }
     return { canceled: true, filePaths: [] };
   }
 

@@ -1,9 +1,9 @@
 # BMM-Executive Module Installer Configuration
-# Complete 9-agent executive suite for enterprise projects
+# Complete 10-agent executive suite for enterprise projects
 
 name: bmm-executive
 display_name: 'BMM Executive Suite'
-description: 'Complete 9-agent executive architecture with Strategist Marketer (Sage), Technologist Architect (Theo), Fulfillization Manager (Finn), Security Guardian (Cerberus), Analyst Strategist (Mary), Financial Strategist (Walt), Operations Commander (Axel), Apex (Peak Performance), and Zen (Clean Architecture)'
+description: 'Complete 10-agent executive architecture with Strategist Marketer (Sage), Technologist Architect (Theo), Fulfillization Manager (Finn), Security Guardian (Cerberus), Financial Strategist (Stermark), Operations Commander (Axel), Apex (Peak Performance), Zen (Clean Architecture), Echon (Post-Launch Lifecycle), and Marketing Outreach (Ajwash)'
 version: '1.0.0'
 author: 'BMad'
 
@@ -93,12 +93,16 @@ install:
       description: 'Cerberus - Security Architect + Risk Guardian'
       agent: 'agents/security-guardian.md'
 
-    - name: 'bmad:bmm-executive:agents:analyst-strategist'
-      description: 'Mary - Chief Analyst + Strategic Intelligence Expert'
-      agent: 'agents/analyst-strategist.md'
+    - name: 'bmad:bmm-executive:agents:echon'
+      description: 'Echon - Post-Launch Lifecycle Architect + Product Vitality Commander'
+      agent: 'agents/echon.md'
+
+    - name: 'bmad:bmm-executive:agents:marketing-outreach'
+      description: 'Ajwash - Marketing Campaign & Outreach Specialist'
+      agent: 'agents/marketing-outreach.md'
 
     - name: 'bmad:bmm-executive:agents:financial-strategist'
-      description: 'Walt - Financial Strategist + Resource Allocator'
+      description: 'Stermark - Financial Strategist + Resource Allocator'
       agent: 'agents/financial-strategist.md'
 
     - name: 'bmad:bmm-executive:agents:operations-commander'
@@ -136,7 +140,7 @@ install:
 post_install_message: |
   🏛️ BMM-Executive Suite installed successfully!
 
-  Your 9-agent executive team is ready:
+  Your 10-agent executive team is ready:
 
   **Original Triad:**
     📊 Sage (Strategist Marketer) - Business WHY & WHO (CMO/CPO)
@@ -145,9 +149,10 @@ post_install_message: |
 
   **New Executive Additions:**
     🛡️ Cerberus (Security Guardian) - Security & Risk (CISO)
-    📊 Mary (Analyst Strategist) - Research & Analysis (Chief Analyst)
-    💰 Walt (Financial Strategist) - Financial Strategy (CFO)
+    💰 Stermark (Financial Strategist) - Financial Strategy (CFO)
     ⚙️ Axel (Operations Commander) - Operations & Process (COO)
+    📡 Echon (Post-Launch Lifecycle) - Product Vitality & Lifecycle (PLM)
+    🌸 Ajwash (Marketing Outreach) - Marketing Campaign & Outreach (CMO)
 
   **Master Developer Additions:**
     ⚡ Apex (Peak Performance) - Full-Stack Performance & Delivery Acceleration

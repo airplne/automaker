@@ -12,7 +12,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createLogger } from '@automaker/utils';
 
-const logger = createLogger('TerminalService');
+const logger = createLogger('Terminal');
 
 // Maximum scrollback buffer size (characters)
 const MAX_SCROLLBACK_SIZE = 50000; // ~50KB per terminal
@@ -239,7 +239,7 @@ export class TerminalService extends EventEmitter {
   setMaxSessions(limit: number): void {
     if (limit >= MIN_MAX_SESSIONS && limit <= MAX_MAX_SESSIONS) {
       maxSessions = limit;
-      console.log(`[Terminal] Max sessions limit updated to ${limit}`);
+      logger.debug(`Max sessions limit updated to ${limit}`);
     }
   }
 
@@ -250,7 +250,7 @@ export class TerminalService extends EventEmitter {
   createSession(options: TerminalOptions = {}): TerminalSession | null {
     // Check session limit
     if (this.sessions.size >= maxSessions) {
-      console.error(`[Terminal] Max sessions (${maxSessions}) reached, refusing new session`);
+      logger.warn(`Max sessions (${maxSessions}) reached, refusing new session`);
       return null;
     }
 
@@ -294,7 +294,7 @@ export class TerminalService extends EventEmitter {
       });
     }
 
-    console.log(`[Terminal] Creating session ${id} with shell: ${shell} in ${cwd}`);
+    logger.debug(`Creating session ${id} with shell: ${shell} in ${cwd}`);
 
     const ptyProcess = pty.spawn(shell, shellArgs, {
       name: 'xterm-256color',
@@ -366,13 +366,12 @@ export class TerminalService extends EventEmitter {
 
     // Handle exit
     ptyProcess.onExit(({ exitCode }) => {
-      console.log(`[Terminal] Session ${id} exited with code ${exitCode}`);
+      logger.debug(`Session ${id} exited with code ${exitCode}`);
       this.sessions.delete(id);
       this.exitCallbacks.forEach((cb) => cb(id, exitCode));
       this.emit('exit', id, exitCode);
     });
 
-    console.log(`[Terminal] Session ${id} created successfully`);
     return session;
   }
 
@@ -382,7 +381,7 @@ export class TerminalService extends EventEmitter {
   write(sessionId: string, data: string): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) {
-      console.warn(`[Terminal] Session ${sessionId} not found`);
+      logger.warn(`Session ${sessionId} not found`);
       return false;
     }
     session.pty.write(data);
@@ -397,7 +396,7 @@ export class TerminalService extends EventEmitter {
   resize(sessionId: string, cols: number, rows: number, suppressOutput: boolean = true): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) {
-      console.warn(`[Terminal] Session ${sessionId} not found for resize`);
+      logger.warn(`Session ${sessionId} not found for resize`);
       return false;
     }
     try {
@@ -423,7 +422,7 @@ export class TerminalService extends EventEmitter {
 
       return true;
     } catch (error) {
-      console.error(`[Terminal] Error resizing session ${sessionId}:`, error);
+      logger.error(`Error resizing session ${sessionId}:`, error);
       session.resizeInProgress = false; // Clear flag on error
       return false;
     }
@@ -451,14 +450,14 @@ export class TerminalService extends EventEmitter {
       }
 
       // First try graceful SIGTERM to allow process cleanup
-      console.log(`[Terminal] Session ${sessionId} sending SIGTERM`);
+      logger.debug(`Session ${sessionId} sending SIGTERM`);
       session.pty.kill('SIGTERM');
 
       // Schedule SIGKILL fallback if process doesn't exit gracefully
       // The onExit handler will remove session from map when it actually exits
       setTimeout(() => {
         if (this.sessions.has(sessionId)) {
-          console.log(`[Terminal] Session ${sessionId} still alive after SIGTERM, sending SIGKILL`);
+          logger.debug(`Session ${sessionId} still alive after SIGTERM, sending SIGKILL`);
           try {
             session.pty.kill('SIGKILL');
           } catch {
@@ -469,10 +468,10 @@ export class TerminalService extends EventEmitter {
         }
       }, 1000);
 
-      console.log(`[Terminal] Session ${sessionId} kill initiated`);
+      logger.debug(`Session ${sessionId} kill initiated`);
       return true;
     } catch (error) {
-      console.error(`[Terminal] Error killing session ${sessionId}:`, error);
+      logger.error(`Error killing session ${sessionId}:`, error);
       // Still try to remove from map even if kill fails
       this.sessions.delete(sessionId);
       return false;
@@ -555,7 +554,7 @@ export class TerminalService extends EventEmitter {
    * Clean up all sessions
    */
   cleanup(): void {
-    console.log(`[Terminal] Cleaning up ${this.sessions.size} sessions`);
+    logger.debug(`Cleaning up ${this.sessions.size} sessions`);
     this.sessions.forEach((session, id) => {
       try {
         // Clean up flush timeout

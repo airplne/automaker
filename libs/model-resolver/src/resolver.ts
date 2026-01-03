@@ -8,6 +8,9 @@
  */
 
 import { CLAUDE_MODEL_MAP, DEFAULT_MODELS } from '@automaker/types';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('ModelResolver');
 
 /**
  * Resolve a model key/alias to a full model string
@@ -34,19 +37,19 @@ export function resolveModelString(
 
   // Full Claude model string - pass through unchanged
   if (lowered.includes('claude-')) {
-    console.log(`[ModelResolver] Using full Claude model string: ${lowered}`);
+    logger.debug(`Using full Claude model string: ${lowered}`);
     return lowered;
   }
 
   // Look up Claude model alias
   const resolved = CLAUDE_MODEL_MAP[lowered];
   if (resolved) {
-    console.log(`[ModelResolver] Resolved model alias: "${lowered}" -> "${resolved}"`);
+    logger.debug(`Resolved model alias: "${lowered}" -> "${resolved}"`);
     return resolved;
   }
 
   // Unknown key: treat as a raw model identifier (enables non-Claude providers like Ollama/OpenAI).
-  console.log(`[ModelResolver] Using raw model string: ${trimmed}`);
+  logger.debug(`Using raw model string: ${trimmed}`);
   return trimmed;
 }
 

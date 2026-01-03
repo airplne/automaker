@@ -524,7 +524,7 @@ export interface AppState {
     featureId: string;
     projectPath: string;
     planContent: string;
-    planningMode: 'lite' | 'spec' | 'full';
+    planningMode: 'lite' | 'spec' | 'full' | 'wizard';
   } | null;
 
   // Npm Security Approval State
@@ -888,7 +888,7 @@ export interface AppActions {
       featureId: string;
       projectPath: string;
       planContent: string;
-      planningMode: 'lite' | 'spec' | 'full';
+      planningMode: 'lite' | 'spec' | 'full' | 'wizard';
     } | null
   ) => void;
 
@@ -926,6 +926,17 @@ export interface AppActions {
   setClaudeRefreshInterval: (interval: number) => void;
   setClaudeUsageLastUpdated: (timestamp: number) => void;
   setClaudeUsage: (usage: ClaudeUsage | null) => void;
+
+  // Pipeline actions
+  setPipelineConfig: (projectPath: string, config: PipelineConfig) => void;
+  getPipelineConfig: (projectPath: string) => PipelineConfig | null;
+  addPipelineStep: (
+    projectPath: string,
+    step: Omit<PipelineStep, 'id' | 'createdAt' | 'updatedAt'>
+  ) => PipelineStep;
+  updatePipelineStep: (projectPath: string, stepId: string, updates: Partial<PipelineStep>) => void;
+  deletePipelineStep: (projectPath: string, stepId: string) => void;
+  reorderPipelineSteps: (projectPath: string, stepIds: string[]) => void;
 
   // Reset
   reset: () => void;
@@ -1002,7 +1013,7 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
   {
     id: 'profile-bmad-finn',
     name: 'BMAD: Finn (Fulfillization-Manager)',
-    description: 'Delivery + Experience + Operations Specialist. End-to-end execution and quality.',
+    description: 'Lead - Arrival Executor. Vision to reality orchestration.',
     model: 'opus',
     thinkingLevel: 'medium',
     provider: 'claude',
@@ -1022,19 +1033,8 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     personaId: 'bmad:security-guardian',
   },
   {
-    id: 'profile-bmad-mary',
-    name: 'BMAD: Mary (Analyst-Strategist)',
-    description: 'Chief Analyst + Strategic Intelligence Expert. Research and requirements.',
-    model: 'opus',
-    thinkingLevel: 'high',
-    provider: 'claude',
-    isBuiltIn: true,
-    icon: 'FileSearch',
-    personaId: 'bmad:analyst-strategist',
-  },
-  {
-    id: 'profile-bmad-walt',
-    name: 'BMAD: Walt (Financial-Strategist)',
+    id: 'profile-bmad-stermark',
+    name: 'BMAD: Stermark (Financial-Strategist)',
     description: 'Financial Strategist + Resource Allocator. Budgets and ROI analysis.',
     model: 'opus',
     thinkingLevel: 'medium',
@@ -1089,6 +1089,259 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     isBuiltIn: true,
     icon: 'Radio',
     personaId: 'bmad:echon',
+  },
+  {
+    id: 'profile-bmad-petal',
+    name: 'BMAD: Petal',
+    description: 'Marketing Campaign & Outreach Specialist',
+    model: 'opus',
+    thinkingLevel: 'medium',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Megaphone',
+    personaId: 'bmad:marketing-outreach',
+  },
+
+  // =============================================================================
+  // CORE MODULE (1 agent)
+  // =============================================================================
+  {
+    id: 'profile-bmad-bmad-master',
+    name: 'BMAD: BMad Master',
+    description:
+      'Master Task Executor + BMad Knowledge Custodian. Orchestrates workflows and manages runtime resources.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Sparkles',
+    personaId: 'bmad:bmad-master',
+  },
+
+  // =============================================================================
+  // BMB MODULE - Builder Agents (3 agents)
+  // =============================================================================
+  {
+    id: 'profile-bmad-agent-builder',
+    name: 'BMAD: Bond (Agent Builder)',
+    description:
+      'Agent Architecture Specialist. Creates robust, BMAD-compliant agents with authentic personas.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Cpu',
+    personaId: 'bmad:agent-builder',
+  },
+  {
+    id: 'profile-bmad-module-builder',
+    name: 'BMAD: Morgan (Module Builder)',
+    description:
+      'Module Architecture Specialist. Designs cohesive, scalable modules with end-to-end integration.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Scale',
+    personaId: 'bmad:module-builder',
+  },
+  {
+    id: 'profile-bmad-workflow-builder',
+    name: 'BMAD: Wendy (Workflow Builder)',
+    description:
+      'Workflow Architecture Specialist. Creates efficient, reliable workflows with clear state management.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Rocket',
+    personaId: 'bmad:workflow-builder',
+  },
+
+  // =============================================================================
+  // BMM MODULE - Method Agents (9 agents)
+  // =============================================================================
+  {
+    id: 'profile-bmad-analyst',
+    name: 'BMAD: Mary (Analyst)',
+    description:
+      'Strategic Business Analyst. Translates vague needs into actionable specs with evidence-based insights.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Scale',
+    personaId: 'bmad:analyst',
+  },
+  {
+    id: 'profile-bmad-architect',
+    name: 'BMAD: Winston (Architect)',
+    description:
+      'System Architect. Designs scalable solutions with boring technology that actually works.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Cpu',
+    personaId: 'bmad:architect',
+  },
+  {
+    id: 'profile-bmad-dev',
+    name: 'BMAD: Amelia (Developer)',
+    description:
+      'Senior Software Engineer. Executes stories with strict adherence to acceptance criteria and TDD.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Cpu',
+    personaId: 'bmad:dev',
+  },
+  {
+    id: 'profile-bmad-pm',
+    name: 'BMAD: John (Product Manager)',
+    description:
+      'Investigative Product Strategist. Asks WHY relentlessly and aligns efforts with business impact.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Scale',
+    personaId: 'bmad:pm',
+  },
+  {
+    id: 'profile-bmad-quick-flow-solo-dev',
+    name: 'BMAD: Barry (Quick Flow Dev)',
+    description:
+      'Elite Full-Stack Developer. Minimum ceremony, lean artifacts, ruthless efficiency.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Rocket',
+    personaId: 'bmad:quick-flow-solo-dev',
+  },
+  {
+    id: 'profile-bmad-sm',
+    name: 'BMAD: Bob (Scrum Master)',
+    description:
+      'Technical Scrum Master. Creates developer-ready specs with zero tolerance for ambiguity.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Zap',
+    personaId: 'bmad:sm',
+  },
+  {
+    id: 'profile-bmad-tea',
+    name: 'BMAD: Murat (Test Architect)',
+    description: 'Master Test Architect. Risk-based testing with data-backed quality gates.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Scale',
+    personaId: 'bmad:tea',
+  },
+  {
+    id: 'profile-bmad-tech-writer',
+    name: 'BMAD: Paige (Tech Writer)',
+    description:
+      'Technical Documentation Specialist. Transforms complex concepts into accessible documentation.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Brain',
+    personaId: 'bmad:tech-writer',
+  },
+  {
+    id: 'profile-bmad-ux-designer',
+    name: 'BMAD: Sally (UX Designer)',
+    description:
+      'User Experience Designer. Empathetic advocate creating intuitive, user-centered experiences.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Sparkles',
+    personaId: 'bmad:ux-designer',
+  },
+
+  // =============================================================================
+  // CIS MODULE - Creative/Innovation Agents (6 agents)
+  // =============================================================================
+  {
+    id: 'profile-bmad-brainstorming-coach',
+    name: 'BMAD: Carson (Brainstorming Coach)',
+    description:
+      'Master Brainstorming Facilitator. Creates psychological safety for breakthrough innovation.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Brain',
+    personaId: 'bmad:brainstorming-coach',
+  },
+  {
+    id: 'profile-bmad-creative-problem-solver',
+    name: 'BMAD: Dr. Quinn (Problem Solver)',
+    description:
+      'Systematic Problem-Solving Expert. TRIZ, Theory of Constraints, and Systems Thinking master.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Brain',
+    personaId: 'bmad:creative-problem-solver',
+  },
+  {
+    id: 'profile-bmad-design-thinking-coach',
+    name: 'BMAD: Maya (Design Thinking Coach)',
+    description:
+      'Human-Centered Design Expert. Empathy mapping, prototyping, and user insights virtuoso.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Sparkles',
+    personaId: 'bmad:design-thinking-coach',
+  },
+  {
+    id: 'profile-bmad-innovation-strategist',
+    name: 'BMAD: Victor (Innovation Strategist)',
+    description: 'Disruptive Innovation Oracle. Blue Ocean Strategy and Jobs-to-be-Done expert.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Zap',
+    personaId: 'bmad:innovation-strategist',
+  },
+  {
+    id: 'profile-bmad-presentation-master',
+    name: 'BMAD: Caravaggio (Presentation Master)',
+    description:
+      'Visual Communication Expert. Masters visual hierarchy, audience psychology, and storytelling.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Sparkles',
+    personaId: 'bmad:presentation-master',
+  },
+  {
+    id: 'profile-bmad-storyteller',
+    name: 'BMAD: Sophia (Storyteller)',
+    description:
+      'Master Storyteller. Leverages timeless human truths to create powerful, authentic narratives.',
+    model: 'opus',
+    thinkingLevel: 'ultrathink',
+    provider: 'claude',
+    isBuiltIn: true,
+    icon: 'Brain',
+    personaId: 'bmad:storyteller',
   },
 ];
 
@@ -2891,7 +3144,7 @@ export const useAppStore = create<AppState & AppActions>()(
         }),
 
       // Pipeline actions
-      setPipelineConfig: (projectPath, config) => {
+      setPipelineConfig: (projectPath: string, config: PipelineConfig) => {
         set({
           pipelineConfigByProject: {
             ...(get().pipelineConfigByProject || {}),
@@ -2900,12 +3153,15 @@ export const useAppStore = create<AppState & AppActions>()(
         });
       },
 
-      getPipelineConfig: (projectPath) => {
+      getPipelineConfig: (projectPath: string) => {
         const configs = get().pipelineConfigByProject;
         return configs?.[projectPath] || null;
       },
 
-      addPipelineStep: (projectPath, step) => {
+      addPipelineStep: (
+        projectPath: string,
+        step: Omit<PipelineStep, 'id' | 'createdAt' | 'updatedAt'>
+      ) => {
         const configs = get().pipelineConfigByProject || {};
         const config = configs[projectPath] || { version: 1 as const, steps: [] };
         const now = new Date().toISOString();
@@ -2931,7 +3187,7 @@ export const useAppStore = create<AppState & AppActions>()(
         return newStep;
       },
 
-      updatePipelineStep: (projectPath, stepId, updates) => {
+      updatePipelineStep: (projectPath: string, stepId: string, updates: Partial<PipelineStep>) => {
         const configs = get().pipelineConfigByProject || {};
         const config = configs[projectPath];
         if (!config) return;
@@ -2954,7 +3210,7 @@ export const useAppStore = create<AppState & AppActions>()(
         });
       },
 
-      deletePipelineStep: (projectPath, stepId) => {
+      deletePipelineStep: (projectPath: string, stepId: string) => {
         const configs = get().pipelineConfigByProject || {};
         const config = configs[projectPath];
         if (!config) return;
@@ -2972,19 +3228,19 @@ export const useAppStore = create<AppState & AppActions>()(
         });
       },
 
-      reorderPipelineSteps: (projectPath, stepIds) => {
+      reorderPipelineSteps: (projectPath: string, stepIds: string[]) => {
         const configs = get().pipelineConfigByProject || {};
         const config = configs[projectPath];
         if (!config) return;
 
         const stepMap = new Map(config.steps.map((s) => [s.id, s]));
         const reorderedSteps = stepIds
-          .map((id, index) => {
+          .map((id: string, index: number) => {
             const step = stepMap.get(id);
             if (!step) return null;
             return { ...step, order: index, updatedAt: new Date().toISOString() };
           })
-          .filter((s): s is PipelineStep => s !== null);
+          .filter((s: PipelineStep | null): s is PipelineStep => s !== null);
 
         set({
           pipelineConfigByProject: {

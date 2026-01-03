@@ -163,9 +163,9 @@ IMPORTANT: Do not ask for clarification. The specification is provided above. Ge
 
   logger.info(`Feature stream complete. Total messages: ${messageCount}`);
   logger.info(`Feature response length: ${responseText.length} chars`);
-  logger.info('========== FULL RESPONSE TEXT ==========');
-  logger.info(responseText);
-  logger.info('========== END RESPONSE TEXT ==========');
+  logger.debug(
+    `Feature response preview: ${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}`
+  );
 
   await parseAndCreateFeatures(projectPath, responseText, events);
 

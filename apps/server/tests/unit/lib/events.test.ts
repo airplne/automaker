@@ -126,5 +126,117 @@ describe('events.ts', () => {
       expect(callback2).toHaveBeenCalledOnce();
       expect(callback3).toHaveBeenCalledTimes(2);
     });
+
+    describe('throttling', () => {
+      it('should throttle events based on default config', () => {
+        vi.useFakeTimers();
+        const emitter = createEventEmitter();
+        const callback = vi.fn();
+
+        emitter.subscribe(callback);
+
+        // agent:stream has 50ms throttle by default
+        emitter.emit('agent:stream', { msg: 1 });
+        emitter.emit('agent:stream', { msg: 2 }); // Should be throttled
+        emitter.emit('agent:stream', { msg: 3 }); // Should be throttled
+
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(callback).toHaveBeenCalledWith('agent:stream', { msg: 1 });
+
+        vi.advanceTimersByTime(50);
+        emitter.emit('agent:stream', { msg: 4 }); // Should not be throttled
+
+        expect(callback).toHaveBeenCalledTimes(2);
+        expect(callback).toHaveBeenLastCalledWith('agent:stream', { msg: 4 });
+
+        vi.useRealTimers();
+      });
+
+      it('should not throttle events without throttle config', () => {
+        const emitter = createEventEmitter();
+        const callback = vi.fn();
+
+        emitter.subscribe(callback);
+
+        // feature:started is not in throttle config
+        emitter.emit('feature:started', { id: 1 });
+        emitter.emit('feature:started', { id: 2 });
+        emitter.emit('feature:started', { id: 3 });
+
+        expect(callback).toHaveBeenCalledTimes(3);
+      });
+
+      it('should support custom throttle config', () => {
+        vi.useFakeTimers();
+        const customConfig = { 'feature:started': 200 };
+        const emitter = createEventEmitter(customConfig);
+        const callback = vi.fn();
+
+        emitter.subscribe(callback);
+
+        emitter.emit('feature:started', { id: 1 });
+        emitter.emit('feature:started', { id: 2 }); // Should be throttled
+
+        expect(callback).toHaveBeenCalledTimes(1);
+
+        vi.advanceTimersByTime(199);
+        emitter.emit('feature:started', { id: 3 }); // Should still be throttled
+
+        expect(callback).toHaveBeenCalledTimes(1);
+
+        vi.advanceTimersByTime(1);
+        emitter.emit('feature:started', { id: 4 }); // Should not be throttled
+
+        expect(callback).toHaveBeenCalledTimes(2);
+
+        vi.useRealTimers();
+      });
+
+      it('should throttle each event type independently', () => {
+        vi.useFakeTimers();
+        const customConfig = {
+          'agent:stream': 50,
+          'feature:started': 100,
+        };
+        const emitter = createEventEmitter(customConfig);
+        const callback = vi.fn();
+
+        emitter.subscribe(callback);
+
+        emitter.emit('agent:stream', { msg: 1 });
+        emitter.emit('feature:started', { id: 1 });
+        emitter.emit('agent:stream', { msg: 2 }); // Throttled
+        emitter.emit('feature:started', { id: 2 }); // Throttled
+
+        expect(callback).toHaveBeenCalledTimes(2);
+
+        vi.advanceTimersByTime(50);
+        emitter.emit('agent:stream', { msg: 3 }); // Not throttled
+        emitter.emit('feature:started', { id: 3 }); // Still throttled
+
+        expect(callback).toHaveBeenCalledTimes(3);
+
+        vi.advanceTimersByTime(50);
+        emitter.emit('feature:started', { id: 4 }); // Not throttled
+
+        expect(callback).toHaveBeenCalledTimes(4);
+
+        vi.useRealTimers();
+      });
+
+      it('should allow disabling throttling with empty config', () => {
+        const emitter = createEventEmitter({});
+        const callback = vi.fn();
+
+        emitter.subscribe(callback);
+
+        // All events should pass through
+        emitter.emit('agent:stream', { msg: 1 });
+        emitter.emit('agent:stream', { msg: 2 });
+        emitter.emit('agent:stream', { msg: 3 });
+
+        expect(callback).toHaveBeenCalledTimes(3);
+      });
+    });
   });
 });

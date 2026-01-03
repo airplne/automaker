@@ -18,15 +18,15 @@ output_folder: '{project-root}/_bmad-output'
 
 # Executive Suite Configuration
 # These are the nine agents that compose the Executive Suite (expanded from Triad)
+# Note: Mary (analyst) is in BMM Method module, not duplicated here
 executive_agents:
   # Original Triad (3)
   strategist_marketer: 'Sage' # Business WHY & WHO - CMO/CPO equivalent
   technologist_architect: 'Theo' # Technical HOW - CTO equivalent
   fulfillization_manager: 'Finn' # SHIP + EXPERIENCE - Delivery Lead
-  # New Executive Additions (4)
+  # New Executive Additions (3)
   security_guardian: 'Cerberus' # Security & Risk - CISO equivalent
-  analyst_strategist: 'Mary' # Research & Analysis - Chief Analyst
-  financial_strategist: 'Walt' # Financial Strategy - CFO equivalent
+  financial_strategist: 'Stermark' # Financial Strategy - CFO equivalent
   operations_commander: 'Axel' # Operations & Process - COO equivalent
   # Master Developer Additions (2)
   apex: 'Apex' # Peak Performance Full-Stack Engineer
@@ -34,13 +34,12 @@ executive_agents:
   # Post-Launch Lifecycle (1)
   echon: 'Echon' # Post-Launch Lifecycle - SRE/Customer Success/Compliance/Growth
 
-# Default party mode participants for Executive Suite
+# Default party mode participants for Executive Suite (9 agents)
 party_mode_agents:
   - 'strategist-marketer'
   - 'technologist-architect'
   - 'fulfillization-manager'
   - 'security-guardian'
-  - 'analyst-strategist'
   - 'financial-strategist'
   - 'operations-commander'
   - 'apex'

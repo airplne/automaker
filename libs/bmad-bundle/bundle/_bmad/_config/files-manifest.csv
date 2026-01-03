@@ -463,7 +463,6 @@ type,name,module,path,hash
 "md","strategist-marketer","bmm-executive","bmm-executive/agents/strategist-marketer.md","1a4f0a104437751cf4c84518648d86cd9b9b65e56f82420399e036fe7f17b124"
 "md","fulfillization-manager","bmm-executive","bmm-executive/agents/fulfillization-manager.md","3866d9e266d346905cdbb5f525580c31fd629a6c6229ceb4333efaa9b5835d3f"
 "md","security-guardian","bmm-executive","bmm-executive/agents/security-guardian.md","d592686c6e668b6c7ceb6ad64d9ce9b0cf93a888ac7f4d3f009a79e9d191a72c"
-"md","analyst-strategist","bmm-executive","bmm-executive/agents/analyst-strategist.md","c45f75518991e8abef002b4a471a424143d7f7d3183b4b10297f2a9f542d6ac6"
 "md","financial-strategist","bmm-executive","bmm-executive/agents/financial-strategist.md","90448ea4bb2ee458293c6bf9088b72e7924440ebdf6c9bff9cb949c0a57b4664"
 "md","operations-commander","bmm-executive","bmm-executive/agents/operations-commander.md","c3af6954f9d3c1546574183149ac4ef40208a778a9ec5f1fa4b4baf7d19b5fe0"
 "md","apex","bmm-executive","bmm-executive/agents/apex.md","79489c679e7821f8be8e12342abeee4f6e4aaded5e8a336c296e8ca6fdc7ddbd"

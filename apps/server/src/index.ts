@@ -17,6 +17,7 @@ import dotenv from 'dotenv';
 
 import { createEventEmitter, type EventEmitter } from './lib/events.js';
 import { initAllowedPaths } from '@automaker/platform';
+import { createLogger } from '@automaker/utils';
 import { authMiddleware, validateWsConnectionToken, checkRawAuthentication } from './lib/auth.js';
 import { requireJsonContentType } from './middleware/require-json-content-type.js';
 import { createAuthRoutes } from './routes/auth/index.js';
@@ -66,7 +67,11 @@ dotenv.config({ quiet: true });
 
 const PORT = parseInt(process.env.PORT || '3008', 10);
 const DATA_DIR = process.env.DATA_DIR || './data';
-const ENABLE_REQUEST_LOGGING = process.env.ENABLE_REQUEST_LOGGING !== 'false'; // Default to true
+const ENABLE_REQUEST_LOGGING = process.env.ENABLE_REQUEST_LOGGING === 'true'; // Default to false (opt-in)
+
+// Logger for WebSocket events - verbose event logging uses debug level
+const wsLogger = createLogger('WebSocket');
+const terminalLogger = createLogger('TerminalWS');
 
 // Check for required environment variables
 const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
@@ -96,7 +101,28 @@ if (ENABLE_REQUEST_LOGGING) {
 
   app.use(
     morgan(':method :url :status-colored', {
-      skip: (req) => req.url === '/api/health', // Skip health check logs
+      // Skip frequently polled endpoints and OPTIONS preflight requests to reduce log spam
+      skip: (req) => {
+        const url = req.url || '';
+        // Skip all OPTIONS preflight requests
+        if (req.method === 'OPTIONS') return true;
+        // Skip frequently polled endpoints
+        if (url.includes('/api/worktree/list')) return true;
+        if (url.includes('/api/running-agents')) return true;
+        if (url.includes('/api/auth/status')) return true;
+        if (url.includes('/api/auth/token')) return true;
+        if (url.includes('/api/auth/logout')) return true;
+        if (url.includes('/api/auto-mode/status')) return true;
+        if (url.includes('/api/features/agent-output')) return true;
+        if (url.includes('/api/features/list')) return true;
+        if (url.includes('/api/health')) return true;
+        if (url.includes('/api/settings/status')) return true;
+        if (url.includes('/api/github/validations')) return true;
+        if (url.includes('/api/github/check-remote')) return true;
+        if (url.includes('/api/pipeline/config')) return true;
+        if (url.includes('/api/fs/read')) return true;
+        return false;
+      },
     })
   );
 }
@@ -256,7 +282,7 @@ server.on('upgrade', (request, socket, head) => {
 
   // Authenticate all WebSocket connections
   if (!authenticateWebSocket(request)) {
-    console.log('[WebSocket] Authentication failed, rejecting connection');
+    wsLogger.warn('Authentication failed, rejecting connection');
     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
     socket.destroy();
     return;
@@ -276,42 +302,34 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 // Events WebSocket connection handler
+// Track connection count to reduce log spam during HMR
+let wsConnectionCount = 0;
 wss.on('connection', (ws: WebSocket) => {
-  console.log('[WebSocket] Client connected, ready state:', ws.readyState);
+  wsConnectionCount++;
+  // Only log first connection or every 10th to reduce spam during HMR
+  if (wsConnectionCount === 1 || wsConnectionCount % 10 === 0) {
+    wsLogger.info(`Client connected (total: ${wsConnectionCount})`);
+  }
 
   // Subscribe to all events and forward to this client
   const unsubscribe = events.subscribe((type, payload) => {
-    console.log('[WebSocket] Event received:', {
-      type,
-      hasPayload: !!payload,
-      payloadKeys: payload ? Object.keys(payload) : [],
-      wsReadyState: ws.readyState,
-      wsOpen: ws.readyState === WebSocket.OPEN,
-    });
-
     if (ws.readyState === WebSocket.OPEN) {
       const message = JSON.stringify({ type, payload });
-      console.log('[WebSocket] Sending event to client:', {
-        type,
-        messageLength: message.length,
-        sessionId: (payload as any)?.sessionId,
-      });
       ws.send(message);
-    } else {
-      console.log(
-        '[WebSocket] WARNING: Cannot send event, WebSocket not open. ReadyState:',
-        ws.readyState
-      );
     }
   });
 
   ws.on('close', () => {
-    console.log('[WebSocket] Client disconnected');
+    wsConnectionCount--;
+    // Only log when no more clients or every 10th disconnect
+    if (wsConnectionCount === 0 || wsConnectionCount % 10 === 0) {
+      wsLogger.info(`Client disconnected (remaining: ${wsConnectionCount})`);
+    }
     unsubscribe();
   });
 
   ws.on('error', (error) => {
-    console.error('[WebSocket] ERROR:', error);
+    wsLogger.error('ERROR:', error);
     unsubscribe();
   });
 });
@@ -338,24 +356,24 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
   const sessionId = url.searchParams.get('sessionId');
   const token = url.searchParams.get('token');
 
-  console.log(`[Terminal WS] Connection attempt for session: ${sessionId}`);
+  terminalLogger.debug(`Connection attempt for session: ${sessionId}`);
 
   // Check if terminal is enabled
   if (!isTerminalEnabled()) {
-    console.log('[Terminal WS] Terminal is disabled');
+    terminalLogger.warn('Terminal is disabled');
     ws.close(4003, 'Terminal access is disabled');
     return;
   }
 
   // Validate token if password is required
   if (isTerminalPasswordRequired() && !validateTerminalToken(token || undefined)) {
-    console.log('[Terminal WS] Invalid or missing token');
+    terminalLogger.warn('Invalid or missing token');
     ws.close(4001, 'Authentication required');
     return;
   }
 
   if (!sessionId) {
-    console.log('[Terminal WS] No session ID provided');
+    terminalLogger.warn('No session ID provided');
     ws.close(4002, 'Session ID required');
     return;
   }
@@ -363,12 +381,12 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
   // Check if session exists
   const session = terminalService.getSession(sessionId);
   if (!session) {
-    console.log(`[Terminal WS] Session ${sessionId} not found`);
+    terminalLogger.warn(`Session ${sessionId} not found`);
     ws.close(4004, 'Session not found');
     return;
   }
 
-  console.log(`[Terminal WS] Client connected to session ${sessionId}`);
+  terminalLogger.debug(`Client connected to session ${sessionId}`);
 
   // Track this connection
   if (!terminalConnections.has(sessionId)) {
@@ -484,15 +502,15 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
           break;
 
         default:
-          console.warn(`[Terminal WS] Unknown message type: ${msg.type}`);
+          terminalLogger.warn(`Unknown message type: ${msg.type}`);
       }
     } catch (error) {
-      console.error('[Terminal WS] Error processing message:', error);
+      terminalLogger.error('Error processing message:', error);
     }
   });
 
   ws.on('close', () => {
-    console.log(`[Terminal WS] Client disconnected from session ${sessionId}`);
+    terminalLogger.debug(`Client disconnected from session ${sessionId}`);
     unsubscribeData();
     unsubscribeExit();
 
@@ -511,7 +529,7 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
   });
 
   ws.on('error', (error) => {
-    console.error(`[Terminal WS] Error on session ${sessionId}:`, error);
+    terminalLogger.error(`Error on session ${sessionId}:`, error);
     unsubscribeData();
     unsubscribeExit();
   });

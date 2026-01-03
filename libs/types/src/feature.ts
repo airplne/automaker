@@ -68,6 +68,8 @@ export interface Feature {
   personaId?: string;
   /** Selected BMAD agents for collaboration (max 4) */
   agentIds?: string[];
+  /** Show explicit agent perspectives in output during multi-agent collaboration */
+  verboseCollaboration?: boolean;
   passes?: boolean;
   priority?: number;
   status?: string;

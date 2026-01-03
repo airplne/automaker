@@ -408,7 +408,6 @@ type,name,module,path,hash
 "yaml","workflow","bmm","bmm/workflows/workflow-status/workflow.yaml","390e733bee776aaf0312c5990cdfdb2d65c4f7f56001f428b8baddeb3fe8f0fe"
 "yaml","workflow-status-template","bmm","bmm/workflows/workflow-status/workflow-status-template.yaml","0ec9c95f1690b7b7786ffb4ab10663c93b775647ad58e283805092e1e830a0d9"
 "csv","default-party","bmm-executive","bmm-executive/teams/default-party.csv","8555daa5cf98eff9c5ce9e3bb286e0e0cce446625320634f2ed491081dab2e22"
-"md","analyst-strategist","bmm-executive","bmm-executive/agents/analyst-strategist.md","c45f75518991e8abef002b4a471a424143d7f7d3183b4b10297f2a9f542d6ac6"
 "md","apex","bmm-executive","bmm-executive/agents/apex.md","79489c679e7821f8be8e12342abeee4f6e4aaded5e8a336c296e8ca6fdc7ddbd"
 "md","financial-strategist","bmm-executive","bmm-executive/agents/financial-strategist.md","90448ea4bb2ee458293c6bf9088b72e7924440ebdf6c9bff9cb949c0a57b4664"
 "md","fulfillization-manager","bmm-executive","bmm-executive/agents/fulfillization-manager.md","3866d9e266d346905cdbb5f525580c31fd629a6c6229ceb4333efaa9b5835d3f"

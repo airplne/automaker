@@ -5,6 +5,10 @@
 import { secureFs } from '@automaker/platform';
 import path from 'path';
 
+import { createLogger } from './logger.js';
+
+const logger = createLogger('FSUtils');
+
 /**
  * Create a directory, handling symlinks safely to avoid ELOOP errors.
  * If the path already exists as a directory or symlink, returns success.
@@ -27,7 +31,7 @@ export async function mkdirSafe(dirPath: string): Promise<void> {
       // Some other error (could be ELOOP in parent path)
       // If it's ELOOP, the path involves symlinks - don't try to create
       if (error.code === 'ELOOP') {
-        console.warn(`[fs-utils] Symlink loop detected at ${resolvedPath}, skipping mkdir`);
+        logger.warn(`Symlink loop detected at ${resolvedPath}, skipping mkdir`);
         return;
       }
       throw error;

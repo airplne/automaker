@@ -11,6 +11,9 @@
 import { secureFs } from '@automaker/platform';
 import path from 'path';
 import type { ImageData, ImageContentBlock } from '@automaker/types';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('ImageHandler');
 
 /**
  * MIME type mapping for image file extensions
@@ -85,7 +88,7 @@ export async function convertImagesToContentBlocks(
         },
       });
     } catch (error) {
-      console.error(`[ImageHandler] Failed to load image ${imagePath}:`, error);
+      logger.error(`Failed to load image ${imagePath}:`, error);
       // Continue processing other images
     }
   }

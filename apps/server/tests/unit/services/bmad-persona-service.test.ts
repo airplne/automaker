@@ -304,8 +304,7 @@ fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Executive 
     it('should return correct defaults for executive suite agents', async () => {
       const mockCsv = `name,displayName,title,icon,role,identity,communicationStyle,principles,module,path
 security-guardian,Cerberus,Security Guardian,🛡️,Security Architect,Security expert,Vigilant,Security principles,bmm-executive,/path
-analyst-strategist,Mary,Chief Analyst,📊,Chief Analyst,Analysis expert,Analytical,Analysis principles,bmm-executive,/path
-financial-strategist,Walt,Financial Strategist,💰,Financial Strategist,Finance expert,Precise,Financial principles,bmm-executive,/path
+financial-strategist,Stermark,Financial Strategist,💰,Financial Strategist,Finance expert,Precise,Financial principles,bmm-executive,/path
 operations-commander,Axel,Operations Commander,⚙️,Operations Commander,Ops expert,Systematic,Ops principles,bmm-executive,/path
 apex,Apex,Peak Performance Full-Stack Engineer,⚡,Full-stack engineer,Performance expert,Direct,Performance principles,bmm-executive,/path
 zen,Zen,Clean Architecture Full-Stack Engineer,🧘,Full-stack engineer,Clean code expert,Thoughtful,Clean code principles,bmm-executive,/path`;
@@ -313,9 +312,6 @@ zen,Zen,Clean Architecture Full-Stack Engineer,🧘,Full-stack engineer,Clean co
 
       const securityGuardian = await service.resolvePersona({
         personaId: 'bmad:security-guardian',
-      });
-      const analystStrategist = await service.resolvePersona({
-        personaId: 'bmad:analyst-strategist',
       });
       const financialStrategist = await service.resolvePersona({
         personaId: 'bmad:financial-strategist',
@@ -331,7 +327,6 @@ zen,Zen,Clean Architecture Full-Stack Engineer,🧘,Full-stack engineer,Clean co
       });
 
       expect(securityGuardian!.thinkingBudget).toBe(10000); // Strategic security role
-      expect(analystStrategist!.thinkingBudget).toBe(10000); // Analyst role
       expect(financialStrategist!.thinkingBudget).toBe(10000); // Strategic role
       expect(operationsCommander!.thinkingBudget).toBe(9000); // Operational role
       expect(apex!.thinkingBudget).toBe(9000); // Balanced execution/optimization thinking
@@ -523,26 +518,24 @@ fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Executive 
 
   describe('executive persona integration', () => {
     beforeEach(() => {
-      // Mock manifest with all 9 executive personas
+      // Mock manifest with all 8 executive personas
       const mockCsv = `name,displayName,title,icon,role,identity,communicationStyle,principles,module,path
 technologist-architect,Theo,Technologist-Architect,🔧,Tech lead,Executive persona,Technical,Quality-driven,bmm-executive,/path/to/technologist-architect.md
 strategist-marketer,Sage,Strategist-Marketer,📊,Strategy lead,Executive persona,Strategic,Data-driven,bmm-executive,/path/to/strategist-marketer.md
 fulfillization-manager,Finn,Fulfillization-Manager,🎯,Delivery lead,Executive persona,Process-oriented,User-focused,bmm-executive,/path/to/fulfillization-manager.md
 security-guardian,Cerberus,Security Guardian,🛡️,Security Architect,Executive persona,Vigilant,Security principles,bmm-executive,/path/to/security-guardian.md
-analyst-strategist,Mary,Chief Analyst,📊,Chief Analyst,Executive persona,Analytical,Analysis principles,bmm-executive,/path/to/analyst-strategist.md
-financial-strategist,Walt,Financial Strategist,💰,Financial Strategist,Executive persona,Precise,Financial principles,bmm-executive,/path/to/financial-strategist.md
+financial-strategist,Stermark,Financial Strategist,💰,Financial Strategist,Executive persona,Precise,Financial principles,bmm-executive,/path/to/financial-strategist.md
 operations-commander,Axel,Operations Commander,⚙️,Operations Commander,Executive persona,Systematic,Ops principles,bmm-executive,/path/to/operations-commander.md
 apex,Apex,Peak Performance Full-Stack Engineer,⚡,Performance engineer,Executive persona,Direct,Performance principles,bmm-executive,/path/to/apex.md
 zen,Zen,Clean Architecture Full-Stack Engineer,🧘,Architecture engineer,Executive persona,Thoughtful,Clean code principles,bmm-executive,/path/to/zen.md`;
       vi.mocked(fs.readFile).mockResolvedValue(mockCsv);
     });
 
-    it('should resolve all 9 executive personas correctly', async () => {
+    it('should resolve all 8 executive personas correctly', async () => {
       const techArch = await service.resolvePersona({ personaId: 'bmad:technologist-architect' });
       const stratMkt = await service.resolvePersona({ personaId: 'bmad:strategist-marketer' });
       const fulfMgr = await service.resolvePersona({ personaId: 'bmad:fulfillization-manager' });
       const secGuard = await service.resolvePersona({ personaId: 'bmad:security-guardian' });
-      const analStrat = await service.resolvePersona({ personaId: 'bmad:analyst-strategist' });
       const finStrat = await service.resolvePersona({ personaId: 'bmad:financial-strategist' });
       const opsCmd = await service.resolvePersona({ personaId: 'bmad:operations-commander' });
       const apex = await service.resolvePersona({ personaId: 'bmad:apex' });
@@ -564,12 +557,8 @@ zen,Zen,Clean Architecture Full-Stack Engineer,🧘,Architecture engineer,Execut
       expect(secGuard!.systemPrompt).toContain('Cerberus');
       expect(secGuard!.systemPrompt).toContain('Security Guardian');
 
-      expect(analStrat).not.toBeNull();
-      expect(analStrat!.systemPrompt).toContain('Mary');
-      expect(analStrat!.systemPrompt).toContain('Chief Analyst');
-
       expect(finStrat).not.toBeNull();
-      expect(finStrat!.systemPrompt).toContain('Walt');
+      expect(finStrat!.systemPrompt).toContain('Stermark');
       expect(finStrat!.systemPrompt).toContain('Financial Strategist');
 
       expect(opsCmd).not.toBeNull();
@@ -585,14 +574,13 @@ zen,Zen,Clean Architecture Full-Stack Engineer,🧘,Architecture engineer,Execut
       expect(zen!.systemPrompt).toContain('Clean Architecture Full-Stack Engineer');
     });
 
-    it('should support all 9 executive personas in agent collaboration', async () => {
+    it('should support all 8 executive personas in agent collaboration', async () => {
       const result = await service.resolveAgentCollab({
         agentIds: [
           'bmad:strategist-marketer',
           'bmad:technologist-architect',
           'bmad:fulfillization-manager',
           'bmad:security-guardian',
-          'bmad:analyst-strategist',
           'bmad:financial-strategist',
           'bmad:operations-commander',
           'bmad:apex',
@@ -601,7 +589,7 @@ zen,Zen,Clean Architecture Full-Stack Engineer,🧘,Architecture engineer,Execut
       });
 
       expect(result).not.toBeNull();
-      expect(result!.agents).toHaveLength(9);
+      expect(result!.agents).toHaveLength(8);
       expect(result!.agents[0].id).toBe('bmad:strategist-marketer');
       expect(result!.agents[0].name).toBe('Sage');
       expect(result!.agents[1].id).toBe('bmad:technologist-architect');
@@ -610,32 +598,29 @@ zen,Zen,Clean Architecture Full-Stack Engineer,🧘,Architecture engineer,Execut
       expect(result!.agents[2].name).toBe('Finn');
       expect(result!.agents[3].id).toBe('bmad:security-guardian');
       expect(result!.agents[3].name).toBe('Cerberus');
-      expect(result!.agents[4].id).toBe('bmad:analyst-strategist');
-      expect(result!.agents[4].name).toBe('Mary');
-      expect(result!.agents[5].id).toBe('bmad:financial-strategist');
-      expect(result!.agents[5].name).toBe('Walt');
-      expect(result!.agents[6].id).toBe('bmad:operations-commander');
-      expect(result!.agents[6].name).toBe('Axel');
-      expect(result!.agents[7].id).toBe('bmad:apex');
-      expect(result!.agents[7].name).toBe('Apex');
-      expect(result!.agents[8].id).toBe('bmad:zen');
-      expect(result!.agents[8].name).toBe('Zen');
+      expect(result!.agents[4].id).toBe('bmad:financial-strategist');
+      expect(result!.agents[4].name).toBe('Stermark');
+      expect(result!.agents[5].id).toBe('bmad:operations-commander');
+      expect(result!.agents[5].name).toBe('Axel');
+      expect(result!.agents[6].id).toBe('bmad:apex');
+      expect(result!.agents[6].name).toBe('Apex');
+      expect(result!.agents[7].id).toBe('bmad:zen');
+      expect(result!.agents[7].name).toBe('Zen');
       expect(result!.combinedSystemPrompt).toContain('Multi-Agent Collaboration Mode');
     });
 
-    it('should list all 9 executive personas in listPersonas', async () => {
+    it('should list all 8 executive personas in listPersonas', async () => {
       const personas = await service.listPersonas();
 
-      expect(personas.length).toBe(10); // party-synthesis + 9 executive
+      expect(personas.length).toBe(9); // party-synthesis + 8 executive
       expect(personas[0].id).toBe('bmad:party-synthesis');
 
-      // Verify all 9 executive agents are present (order may vary after party-synthesis)
+      // Verify all 8 executive agents are present (order may vary after party-synthesis)
       const executiveIds = personas.slice(1).map((p) => p.id);
       expect(executiveIds).toContain('bmad:technologist-architect');
       expect(executiveIds).toContain('bmad:strategist-marketer');
       expect(executiveIds).toContain('bmad:fulfillization-manager');
       expect(executiveIds).toContain('bmad:security-guardian');
-      expect(executiveIds).toContain('bmad:analyst-strategist');
       expect(executiveIds).toContain('bmad:financial-strategist');
       expect(executiveIds).toContain('bmad:operations-commander');
       expect(executiveIds).toContain('bmad:apex');

@@ -74,7 +74,7 @@ export function createVerifyClaudeAuthHandler() {
       // Get the auth method from the request body
       const { authMethod } = req.body as { authMethod?: 'cli' | 'api_key' };
 
-      logger.info(`[Setup] Verifying Claude authentication using method: ${authMethod || 'auto'}`);
+      logger.debug(`[Setup] Verifying Claude authentication using method: ${authMethod || 'auto'}`);
 
       // Create an AbortController with a 30-second timeout
       const abortController = new AbortController();
@@ -92,13 +92,13 @@ export function createVerifyClaudeAuthHandler() {
         if (authMethod === 'cli') {
           // For CLI verification, remove any API key so it uses CLI credentials only
           delete process.env.ANTHROPIC_API_KEY;
-          logger.info('[Setup] Cleared API key environment for CLI verification');
+          logger.debug('[Setup] Cleared API key environment for CLI verification');
         } else if (authMethod === 'api_key') {
           // For API key verification, ensure we're using the stored API key
           const storedApiKey = getApiKey('anthropic');
           if (storedApiKey) {
             process.env.ANTHROPIC_API_KEY = storedApiKey;
-            logger.info('[Setup] Using stored API key for verification');
+            logger.debug('[Setup] Using stored API key for verification');
           } else {
             // Check env var
             if (!process.env.ANTHROPIC_API_KEY) {
@@ -129,7 +129,7 @@ export function createVerifyClaudeAuthHandler() {
         for await (const msg of stream) {
           const msgStr = JSON.stringify(msg);
           allMessages.push(msgStr);
-          logger.info('[Setup] Stream message:', msgStr.substring(0, 500));
+          logger.debug('[Setup] Stream message:', msgStr.substring(0, 100));
 
           // Check for billing errors FIRST - these should fail verification
           if (isBillingError(msgStr)) {
@@ -159,7 +159,7 @@ export function createVerifyClaudeAuthHandler() {
               for (const block of content) {
                 if (block.type === 'text' && block.text) {
                   const text = block.text;
-                  logger.info('[Setup] Assistant text:', text);
+                  logger.debug('[Setup] Assistant text:', text);
 
                   if (containsAuthError(text)) {
                     if (authMethod === 'cli') {

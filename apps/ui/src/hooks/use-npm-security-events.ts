@@ -9,17 +9,24 @@ import type { AutoModeEvent } from '@/types/electron';
  * Listens for 'npm_security_approval_required' events emitted by the auto-mode service
  * and triggers the npm security approval dialog via the app store.
  */
-export function useNpmSecurityEvents() {
+export function useNpmSecurityEvents(options?: { disabled?: boolean }) {
   const { setPendingNpmSecurityApproval } = useAppStore();
 
   useEffect(() => {
+    // Skip if disabled (e.g., on login page)
+    if (options?.disabled) {
+      return;
+    }
+
     const api = getElectronAPI();
     if (!api?.autoMode?.onEvent) {
       console.warn('[useNpmSecurityEvents] Auto mode API not available');
       return;
     }
 
-    console.log('[useNpmSecurityEvents] Subscribing to npm security events');
+    if (import.meta.env.DEV) {
+      console.log('[useNpmSecurityEvents] Subscribing to npm security events');
+    }
 
     const handleEvent = (event: AutoModeEvent) => {
       // Check if this is an npm security approval event
@@ -55,7 +62,9 @@ export function useNpmSecurityEvents() {
     const unsubscribe = api.autoMode.onEvent(handleEvent);
 
     return () => {
-      console.log('[useNpmSecurityEvents] Unsubscribing from npm security events');
+      if (import.meta.env.DEV) {
+        console.log('[useNpmSecurityEvents] Unsubscribing from npm security events');
+      }
       unsubscribe();
     };
   }, [setPendingNpmSecurityApproval]);

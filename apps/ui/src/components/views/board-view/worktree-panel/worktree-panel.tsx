@@ -100,9 +100,17 @@ export function WorktreePanel({
   // Periodic interval check (5 seconds) to detect branch changes on disk
   // Reduced from 1s to 5s to minimize GPU/CPU usage from frequent re-renders
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchWorktreesRef = useRef(fetchWorktrees);
+
+  // Keep ref up to date
+  useEffect(() => {
+    fetchWorktreesRef.current = fetchWorktrees;
+  }, [fetchWorktrees]);
+
+  // Create interval only once on mount
   useEffect(() => {
     intervalRef.current = setInterval(() => {
-      fetchWorktrees({ silent: true });
+      fetchWorktreesRef.current({ silent: true });
     }, 5000);
 
     return () => {
@@ -110,7 +118,7 @@ export function WorktreePanel({
         clearInterval(intervalRef.current);
       }
     };
-  }, [fetchWorktrees]);
+  }, []); // Empty deps - only run once on mount
 
   // Get the currently selected worktree for collapsed view
   const selectedWorktree = worktrees.find((w) => {

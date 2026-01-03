@@ -128,7 +128,7 @@ ${getStructuredSpecPromptInstruction()}`;
   try {
     for await (const msg of stream) {
       messageCount++;
-      logger.info(
+      logger.debug(
         `Stream message #${messageCount}: type=${msg.type}, subtype=${(msg as any).subtype}`
       );
 
@@ -138,7 +138,7 @@ ${getStructuredSpecPromptInstruction()}`;
           for (const block of msgAny.message.content) {
             if (block.type === 'text') {
               responseText += block.text;
-              logger.info(
+              logger.debug(
                 `Text block received (${block.text.length} chars), total now: ${responseText.length} chars`
               );
               events.emit('spec-regeneration:event', {
@@ -147,7 +147,7 @@ ${getStructuredSpecPromptInstruction()}`;
                 projectPath: projectPath,
               });
             } else if (block.type === 'tool_use') {
-              logger.info('Tool use:', block.name);
+              logger.debug('Tool use:', block.name);
               events.emit('spec-regeneration:event', {
                 type: 'spec_tool',
                 tool: block.name,

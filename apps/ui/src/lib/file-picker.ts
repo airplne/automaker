@@ -65,23 +65,31 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
         focusTimeout = null;
       }
 
-      console.log('[FilePicker] Change event fired');
+      if (import.meta.env.DEV) {
+        console.log('[FilePicker] Change event fired');
+      }
       const files = input.files;
-      console.log('[FilePicker] Files selected:', files?.length || 0);
+      if (import.meta.env.DEV) {
+        console.log('[FilePicker] Files selected:', files?.length || 0);
+      }
 
       if (!files || files.length === 0) {
-        console.log('[FilePicker] No files selected');
+        if (import.meta.env.DEV) {
+          console.log('[FilePicker] No files selected');
+        }
         safeResolve(null);
         return;
       }
 
       const firstFile = files[0];
-      console.log('[FilePicker] First file:', {
-        name: firstFile.name,
-        webkitRelativePath: firstFile.webkitRelativePath,
-        // @ts-expect-error - path property is non-standard but available in some browsers
-        path: firstFile.path,
-      });
+      if (import.meta.env.DEV) {
+        console.log('[FilePicker] First file:', {
+          name: firstFile.name,
+          webkitRelativePath: firstFile.webkitRelativePath,
+          // @ts-expect-error - path property is non-standard but available in some browsers
+          path: firstFile.path,
+        });
+      }
 
       // Extract directory name from webkitRelativePath
       // webkitRelativePath format: "directoryName/subfolder/file.txt" or "directoryName/file.txt"
@@ -92,12 +100,16 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
       if (firstFile.path) {
         // @ts-expect-error - path property is non-standard but available in some browsers
         const filePath = firstFile.path as string;
-        console.log('[FilePicker] Found file.path:', filePath);
+        if (import.meta.env.DEV) {
+          console.log('[FilePicker] Found file.path:', filePath);
+        }
         // Extract directory path (remove filename)
         const lastSeparator = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
         if (lastSeparator > 0) {
           const absolutePath = filePath.substring(0, lastSeparator);
-          console.log('[FilePicker] Found absolute path:', absolutePath);
+          if (import.meta.env.DEV) {
+            console.log('[FilePicker] Found absolute path:', absolutePath);
+          }
           // Return as directory name for now - server can validate it directly
           directoryName = absolutePath;
         }
@@ -106,11 +118,15 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
       // Method 2: Extract directory name from webkitRelativePath
       if (directoryName === 'Selected Directory' && firstFile.webkitRelativePath) {
         const relativePath = firstFile.webkitRelativePath;
-        console.log('[FilePicker] Using webkitRelativePath:', relativePath);
+        if (import.meta.env.DEV) {
+          console.log('[FilePicker] Using webkitRelativePath:', relativePath);
+        }
         const pathParts = relativePath.split('/');
         if (pathParts.length > 0) {
           directoryName = pathParts[0]; // Top-level directory name
-          console.log('[FilePicker] Extracted directory name:', directoryName);
+          if (import.meta.env.DEV) {
+            console.log('[FilePicker] Extracted directory name:', directoryName);
+          }
         }
       }
 
@@ -127,11 +143,13 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
         }
       }
 
-      console.log('[FilePicker] Directory info:', {
-        directoryName,
-        fileCount: files.length,
-        sampleFiles: sampleFiles.slice(0, 5), // Log first 5
-      });
+      if (import.meta.env.DEV) {
+        console.log('[FilePicker] Directory info:', {
+          directoryName,
+          fileCount: files.length,
+          sampleFiles: sampleFiles.slice(0, 5), // Log first 5
+        });
+      }
 
       safeResolve({
         directoryName,
@@ -147,7 +165,9 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
       // Only resolve as canceled if change event hasn't fired after a delay
       focusTimeout = setTimeout(() => {
         if (!resolved && !changeEventFired && (!input.files || input.files.length === 0)) {
-          console.log('[FilePicker] Dialog canceled (no files after focus and no change event)');
+          if (import.meta.env.DEV) {
+            console.log('[FilePicker] Dialog canceled (no files after focus and no change event)');
+          }
           safeResolve(null);
         }
       }, 2000); // Increased timeout for Windows - give it time
@@ -155,19 +175,27 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
 
     // Add to DOM temporarily
     document.body.appendChild(input);
-    console.log('[FilePicker] Opening directory picker...');
+    if (import.meta.env.DEV) {
+      console.log('[FilePicker] Opening directory picker...');
+    }
 
     // Try to show picker programmatically
     if ('showPicker' in HTMLInputElement.prototype) {
       try {
         (input as any).showPicker();
-        console.log('[FilePicker] Using showPicker()');
+        if (import.meta.env.DEV) {
+          console.log('[FilePicker] Using showPicker()');
+        }
       } catch (error) {
-        console.log('[FilePicker] showPicker() failed, using click()', error);
+        if (import.meta.env.DEV) {
+          console.log('[FilePicker] showPicker() failed, using click()', error);
+        }
         input.click();
       }
     } else {
-      console.log('[FilePicker] Using click()');
+      if (import.meta.env.DEV) {
+        console.log('[FilePicker] Using click()');
+      }
       input.click();
     }
 

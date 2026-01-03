@@ -170,4 +170,41 @@ Use `resolveModelString()` from `@automaker/model-resolver` to convert model ali
 - `DATA_DIR` - Data storage directory (default: ./data)
 - `ALLOWED_ROOT_DIRECTORY` - Restrict file operations to specific directory
 - `AUTOMAKER_MOCK_AGENT=true` - Enable mock agent mode for CI testing
+- `LOG_LEVEL` - Logging verbosity level (default: info)
+- `ENABLE_REQUEST_LOGGING` - Enable HTTP request logging (default: false)
 - NPM security firewall is currently disabled in code (no env toggle)
+
+## Logging Configuration
+
+The project uses a centralized logging utility from `@automaker/utils`. All server-side code should use the `createLogger` function instead of `console.log`.
+
+### Log Levels
+
+Set via `LOG_LEVEL` environment variable:
+
+- `debug` - Verbose debugging information (development only)
+- `info` - General operational information (default)
+- `warn` - Warning conditions
+- `error` - Error conditions
+
+### Best Practices
+
+```typescript
+// Create a logger for your module
+import { createLogger } from '@automaker/utils';
+const logger = createLogger('my-service');
+
+// Use appropriate log levels
+logger.debug('Detailed debug info', { data }); // Development debugging
+logger.info('Operation completed'); // Normal operations
+logger.warn('Deprecated feature used'); // Warnings
+logger.error('Failed to process', { error }); // Errors
+```
+
+### Key Guidelines
+
+1. **Never use `console.log` in production code** - Always use `createLogger`
+2. **Use meaningful logger names** - The name identifies the source module
+3. **Include context objects** - Pass relevant data as the second argument
+4. **Choose appropriate levels** - Use `debug` for verbose info, `info` for normal operations
+5. **Request logging** - Set `ENABLE_REQUEST_LOGGING=true` for HTTP request debugging

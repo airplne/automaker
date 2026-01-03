@@ -91,12 +91,14 @@ export function useElectronAgent({
       setError(null);
 
       try {
-        console.log('[useElectronAgent] Sending message directly', {
-          hasImages: images && images.length > 0,
-          imageCount: images?.length || 0,
-          hasTextFiles: textFiles && textFiles.length > 0,
-          textFileCount: textFiles?.length || 0,
-        });
+        if (import.meta.env.DEV) {
+          console.log('[useElectronAgent] Sending message directly', {
+            hasImages: images && images.length > 0,
+            imageCount: images?.length || 0,
+            hasTextFiles: textFiles && textFiles.length > 0,
+            textFileCount: textFiles?.length || 0,
+          });
+        }
 
         // Build message content with text file context prepended
         let messageContent = content;
@@ -121,9 +123,13 @@ export function useElectronAgent({
             );
             if (result.success && result.path) {
               imagePaths.push(result.path);
-              console.log('[useElectronAgent] Saved image to .automaker/images:', result.path);
+              if (import.meta.env.DEV) {
+                console.log('[useElectronAgent] Saved image to .automaker/images:', result.path);
+              }
             } else {
-              console.error('[useElectronAgent] Failed to save image:', result.error);
+              if (import.meta.env.DEV) {
+                console.error('[useElectronAgent] Failed to save image:', result.error);
+              }
             }
           }
         }
@@ -143,7 +149,9 @@ export function useElectronAgent({
         // Note: We don't set isProcessing to false here because
         // it will be set by the "complete" or "error" stream event
       } catch (err) {
-        console.error('[useElectronAgent] Failed to send message:', err);
+        if (import.meta.env.DEV) {
+          console.error('[useElectronAgent] Failed to send message:', err);
+        }
         setError(err instanceof Error ? err.message : 'Failed to send message');
         setIsProcessing(false);
         throw err;
@@ -188,13 +196,17 @@ export function useElectronAgent({
       setError(null);
 
       try {
-        console.log('[useElectronAgent] Starting session:', sessionId);
+        if (import.meta.env.DEV) {
+          console.log('[useElectronAgent] Starting session:', sessionId);
+        }
         const result = await api.agent!.start(sessionId, workingDirectory);
 
         if (!mounted) return;
 
         if (result.success && result.messages) {
-          console.log('[useElectronAgent] Loaded', result.messages.length, 'messages');
+          if (import.meta.env.DEV) {
+            console.log('[useElectronAgent] Loaded', result.messages.length, 'messages');
+          }
           setMessages(result.messages);
           setIsConnected(true);
 
@@ -202,7 +214,9 @@ export function useElectronAgent({
           const historyResult = await api.agent!.getHistory(sessionId);
           if (mounted && historyResult.success) {
             const isRunning = historyResult.isRunning || false;
-            console.log('[useElectronAgent] Session running state:', isRunning);
+            if (import.meta.env.DEV) {
+              console.log('[useElectronAgent] Session running state:', isRunning);
+            }
             setIsProcessing(isRunning);
           }
         } else {
@@ -211,7 +225,9 @@ export function useElectronAgent({
         }
       } catch (err) {
         if (!mounted) return;
-        console.error('[useElectronAgent] Failed to initialize:', err);
+        if (import.meta.env.DEV) {
+          console.error('[useElectronAgent] Failed to initialize:', err);
+        }
         setError(err instanceof Error ? err.message : 'Failed to initialize');
         setIsProcessing(false);
       }
@@ -227,7 +243,9 @@ export function useElectronAgent({
   // Auto-process queue when agent finishes processing
   useEffect(() => {
     if (!isProcessing && !isProcessingQueue && queuedMessages.length > 0) {
-      console.log('[useElectronAgent] Auto-processing next queued message');
+      if (import.meta.env.DEV) {
+        console.log('[useElectronAgent] Auto-processing next queued message');
+      }
       processNext();
     }
   }, [isProcessing, isProcessingQueue, queuedMessages.length, processNext]);
@@ -238,21 +256,29 @@ export function useElectronAgent({
     if (!api?.agent) return;
     if (!sessionId) return; // Don't subscribe if no session
 
-    console.log('[useElectronAgent] Subscribing to stream events for session:', sessionId);
+    if (import.meta.env.DEV) {
+      console.log('[useElectronAgent] Subscribing to stream events for session:', sessionId);
+    }
 
     const handleStream = (event: StreamEvent) => {
       // CRITICAL: Only process events for our specific session
       if (event.sessionId !== sessionId) {
-        console.log('[useElectronAgent] Ignoring event for different session:', event.sessionId);
+        if (import.meta.env.DEV) {
+          console.log('[useElectronAgent] Ignoring event for different session:', event.sessionId);
+        }
         return;
       }
 
-      console.log('[useElectronAgent] Stream event for', sessionId, ':', event.type);
+      if (import.meta.env.DEV) {
+        console.log('[useElectronAgent] Stream event for', sessionId, ':', event.type);
+      }
 
       switch (event.type) {
         case 'started':
           // Agent started processing (including from queue)
-          console.log('[useElectronAgent] Agent started processing for session:', sessionId);
+          if (import.meta.env.DEV) {
+            console.log('[useElectronAgent] Agent started processing for session:', sessionId);
+          }
           setIsProcessing(true);
           break;
 
@@ -297,13 +323,17 @@ export function useElectronAgent({
 
         case 'tool_use':
           // Tool being used
-          console.log('[useElectronAgent] Tool use:', event.tool.name);
+          if (import.meta.env.DEV) {
+            console.log('[useElectronAgent] Tool use:', event.tool.name);
+          }
           onToolUse?.(event.tool.name, event.tool.input);
           break;
 
         case 'complete':
           // Agent finished processing for THIS session
-          console.log('[useElectronAgent] Processing complete for session:', sessionId);
+          if (import.meta.env.DEV) {
+            console.log('[useElectronAgent] Processing complete for session:', sessionId);
+          }
           setIsProcessing(false);
           if (event.messageId) {
             setMessages((prev) =>
@@ -316,7 +346,9 @@ export function useElectronAgent({
 
         case 'error':
           // Error occurred for THIS session
-          console.error('[useElectronAgent] Agent error for session:', sessionId, event.error);
+          if (import.meta.env.DEV) {
+            console.error('[useElectronAgent] Agent error for session:', sessionId, event.error);
+          }
           setIsProcessing(false);
           setError(event.error);
           if (event.message) {
@@ -327,13 +359,17 @@ export function useElectronAgent({
 
         case 'queue_updated':
           // Server queue was updated
-          console.log('[useElectronAgent] Queue updated:', event.queue);
+          if (import.meta.env.DEV) {
+            console.log('[useElectronAgent] Queue updated:', event.queue);
+          }
           setServerQueue(event.queue || []);
           break;
 
         case 'queue_error':
           // Error processing a queued prompt
-          console.error('[useElectronAgent] Queue error:', event.error);
+          if (import.meta.env.DEV) {
+            console.error('[useElectronAgent] Queue error:', event.error);
+          }
           setError(event.error);
           break;
       }
@@ -343,7 +379,12 @@ export function useElectronAgent({
 
     return () => {
       if (unsubscribeRef.current) {
-        console.log('[useElectronAgent] Unsubscribing from stream events for session:', sessionId);
+        if (import.meta.env.DEV) {
+          console.log(
+            '[useElectronAgent] Unsubscribing from stream events for session:',
+            sessionId
+          );
+        }
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
@@ -360,7 +401,9 @@ export function useElectronAgent({
       }
 
       if (isProcessing) {
-        console.warn('[useElectronAgent] Already processing a message');
+        if (import.meta.env.DEV) {
+          console.warn('[useElectronAgent] Already processing a message');
+        }
         return;
       }
 
@@ -368,12 +411,14 @@ export function useElectronAgent({
       setError(null);
 
       try {
-        console.log('[useElectronAgent] Sending message', {
-          hasImages: images && images.length > 0,
-          imageCount: images?.length || 0,
-          hasTextFiles: textFiles && textFiles.length > 0,
-          textFileCount: textFiles?.length || 0,
-        });
+        if (import.meta.env.DEV) {
+          console.log('[useElectronAgent] Sending message', {
+            hasImages: images && images.length > 0,
+            imageCount: images?.length || 0,
+            hasTextFiles: textFiles && textFiles.length > 0,
+            textFileCount: textFiles?.length || 0,
+          });
+        }
 
         // Build message content with text file context prepended
         let messageContent = content;
@@ -398,9 +443,13 @@ export function useElectronAgent({
             );
             if (result.success && result.path) {
               imagePaths.push(result.path);
-              console.log('[useElectronAgent] Saved image to .automaker/images:', result.path);
+              if (import.meta.env.DEV) {
+                console.log('[useElectronAgent] Saved image to .automaker/images:', result.path);
+              }
             } else {
-              console.error('[useElectronAgent] Failed to save image:', result.error);
+              if (import.meta.env.DEV) {
+                console.error('[useElectronAgent] Failed to save image:', result.error);
+              }
             }
           }
         }
@@ -420,7 +469,9 @@ export function useElectronAgent({
         // Note: We don't set isProcessing to false here because
         // it will be set by the "complete" or "error" stream event
       } catch (err) {
-        console.error('[useElectronAgent] Failed to send message:', err);
+        if (import.meta.env.DEV) {
+          console.error('[useElectronAgent] Failed to send message:', err);
+        }
         setError(err instanceof Error ? err.message : 'Failed to send message');
         setIsProcessing(false);
       }
@@ -437,7 +488,9 @@ export function useElectronAgent({
     }
 
     try {
-      console.log('[useElectronAgent] Stopping execution');
+      if (import.meta.env.DEV) {
+        console.log('[useElectronAgent] Stopping execution');
+      }
       const result = await api.agent!.stop(sessionId);
 
       if (!result.success) {
@@ -446,7 +499,9 @@ export function useElectronAgent({
         setIsProcessing(false);
       }
     } catch (err) {
-      console.error('[useElectronAgent] Failed to stop:', err);
+      if (import.meta.env.DEV) {
+        console.error('[useElectronAgent] Failed to stop:', err);
+      }
       setError(err instanceof Error ? err.message : 'Failed to stop execution');
     }
   }, [sessionId]);
@@ -460,7 +515,9 @@ export function useElectronAgent({
     }
 
     try {
-      console.log('[useElectronAgent] Clearing history');
+      if (import.meta.env.DEV) {
+        console.log('[useElectronAgent] Clearing history');
+      }
       const result = await api.agent!.clear(sessionId);
 
       if (result.success) {
@@ -470,7 +527,9 @@ export function useElectronAgent({
         setError(result.error || 'Failed to clear history');
       }
     } catch (err) {
-      console.error('[useElectronAgent] Failed to clear:', err);
+      if (import.meta.env.DEV) {
+        console.error('[useElectronAgent] Failed to clear:', err);
+      }
       setError(err instanceof Error ? err.message : 'Failed to clear history');
     }
   }, [sessionId]);
@@ -512,14 +571,18 @@ export function useElectronAgent({
           }
         }
 
-        console.log('[useElectronAgent] Adding to server queue');
+        if (import.meta.env.DEV) {
+          console.log('[useElectronAgent] Adding to server queue');
+        }
         const result = await api.agent.queueAdd(sessionId, messageContent, imagePaths, model);
 
         if (!result.success) {
           setError(result.error || 'Failed to add to queue');
         }
       } catch (err) {
-        console.error('[useElectronAgent] Failed to add to queue:', err);
+        if (import.meta.env.DEV) {
+          console.error('[useElectronAgent] Failed to add to queue:', err);
+        }
         setError(err instanceof Error ? err.message : 'Failed to add to queue');
       }
     },
@@ -536,14 +599,18 @@ export function useElectronAgent({
       }
 
       try {
-        console.log('[useElectronAgent] Removing from server queue:', promptId);
+        if (import.meta.env.DEV) {
+          console.log('[useElectronAgent] Removing from server queue:', promptId);
+        }
         const result = await api.agent.queueRemove(sessionId, promptId);
 
         if (!result.success) {
           setError(result.error || 'Failed to remove from queue');
         }
       } catch (err) {
-        console.error('[useElectronAgent] Failed to remove from queue:', err);
+        if (import.meta.env.DEV) {
+          console.error('[useElectronAgent] Failed to remove from queue:', err);
+        }
         setError(err instanceof Error ? err.message : 'Failed to remove from queue');
       }
     },
@@ -559,14 +626,18 @@ export function useElectronAgent({
     }
 
     try {
-      console.log('[useElectronAgent] Clearing server queue');
+      if (import.meta.env.DEV) {
+        console.log('[useElectronAgent] Clearing server queue');
+      }
       const result = await api.agent.queueClear(sessionId);
 
       if (!result.success) {
         setError(result.error || 'Failed to clear queue');
       }
     } catch (err) {
-      console.error('[useElectronAgent] Failed to clear queue:', err);
+      if (import.meta.env.DEV) {
+        console.error('[useElectronAgent] Failed to clear queue:', err);
+      }
       setError(err instanceof Error ? err.message : 'Failed to clear queue');
     }
   }, [sessionId]);

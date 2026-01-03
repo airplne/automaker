@@ -11,6 +11,9 @@ import { spawn, execSync, type ChildProcess } from 'child_process';
 import * as secureFs from '../lib/secure-fs.js';
 import path from 'path';
 import net from 'net';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('DevServer');
 
 export interface DevServerInfo {
   worktreePath: string;
@@ -69,7 +72,7 @@ class DevServerService {
         for (const pid of pids) {
           try {
             execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
-            console.log(`[DevServerService] Killed process ${pid} on port ${port}`);
+            logger.debug(`Killed process ${pid} on port ${port}`);
           } catch {
             // Process may have already exited
           }
@@ -82,7 +85,7 @@ class DevServerService {
           for (const pid of pids) {
             try {
               execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
-              console.log(`[DevServerService] Killed process ${pid} on port ${port}`);
+              logger.debug(`Killed process ${pid} on port ${port}`);
             } catch {
               // Process may have already exited
             }
@@ -93,7 +96,7 @@ class DevServerService {
       }
     } catch (error) {
       // Ignore errors - port might not have any process
-      console.log(`[DevServerService] No process to kill on port ${port}`);
+      logger.debug(`No process to kill on port ${port}`);
     }
   }
 
@@ -251,11 +254,9 @@ class DevServerService {
     // Small delay to ensure related ports are freed
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    console.log(`[DevServerService] Starting dev server on port ${port}`);
-    console.log(`[DevServerService] Working directory (cwd): ${worktreePath}`);
-    console.log(
-      `[DevServerService] Command: ${devCommand.cmd} ${devCommand.args.join(' ')} with PORT=${port}`
-    );
+    logger.debug(`Starting dev server on port ${port}`);
+    logger.debug(`Working directory (cwd): ${worktreePath}`);
+    logger.debug(`Command: ${devCommand.cmd} ${devCommand.args.join(' ')} with PORT=${port}`);
 
     // Spawn the dev process with PORT environment variable
     const env = {
@@ -273,29 +274,29 @@ class DevServerService {
     // Track if process failed early using object to work around TypeScript narrowing
     const status = { error: null as string | null, exited: false };
 
-    // Log output for debugging
+    // stdout logging removed to prevent console noise - dev server output is managed separately
+    // If stdout debugging is needed, use: devProcess.stdout?.on('data', (data) => logger.debug(...))
     if (devProcess.stdout) {
-      devProcess.stdout.on('data', (data: Buffer) => {
-        console.log(`[DevServer:${port}] ${data.toString().trim()}`);
-      });
+      // Consume stdout to prevent buffer overflow but don't log it
+      devProcess.stdout.on('data', () => {});
     }
 
     if (devProcess.stderr) {
       devProcess.stderr.on('data', (data: Buffer) => {
         const msg = data.toString().trim();
-        console.error(`[DevServer:${port}] ${msg}`);
+        logger.warn(`[DevServer:${port}] ${msg}`);
       });
     }
 
     devProcess.on('error', (error) => {
-      console.error(`[DevServerService] Process error:`, error);
+      logger.error(`Process error:`, error);
       status.error = error.message;
       this.allocatedPorts.delete(port);
       this.runningServers.delete(worktreePath);
     });
 
     devProcess.on('exit', (code) => {
-      console.log(`[DevServerService] Process for ${worktreePath} exited with code ${code}`);
+      logger.debug(`Process for ${worktreePath} exited with code ${code}`);
       status.exited = true;
       this.allocatedPorts.delete(port);
       this.runningServers.delete(worktreePath);
@@ -352,9 +353,7 @@ class DevServerService {
     // If we don't have a record of this server, it may have crashed/exited on its own
     // Return success so the frontend can clear its state
     if (!server) {
-      console.log(
-        `[DevServerService] No server record for ${worktreePath}, may have already stopped`
-      );
+      logger.debug(`No server record for ${worktreePath}, may have already stopped`);
       return {
         success: true,
         result: {
@@ -364,7 +363,7 @@ class DevServerService {
       };
     }
 
-    console.log(`[DevServerService] Stopping dev server for ${worktreePath}`);
+    logger.debug(`Stopping dev server for ${worktreePath}`);
 
     // Kill the process
     if (server.process && !server.process.killed) {
@@ -434,7 +433,7 @@ class DevServerService {
    * Stop all running dev servers (for cleanup)
    */
   async stopAll(): Promise<void> {
-    console.log(`[DevServerService] Stopping all ${this.runningServers.size} dev servers`);
+    logger.debug(`Stopping all ${this.runningServers.size} dev servers`);
 
     for (const [worktreePath] of this.runningServers) {
       await this.stopDevServer(worktreePath);

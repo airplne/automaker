@@ -8,7 +8,9 @@ import type { NpmSecuritySettings } from '@automaker/types';
 const DEFAULT_SETTINGS: NpmSecuritySettings = {
   dependencyInstallPolicy: 'allow',
   allowInstallScripts: true,
+  allowedPackagesForRebuild: [],
   enableAuditLog: true,
+  auditLogRetentionDays: 30,
 };
 
 // Get server URL - same pattern as http-api-client

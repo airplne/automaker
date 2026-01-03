@@ -83,7 +83,9 @@ export function useAutoMode() {
     if (!api?.autoMode) return;
 
     const unsubscribe = api.autoMode.onEvent((event: AutoModeEvent) => {
-      console.log('[AutoMode Event]', event);
+      if (import.meta.env.DEV) {
+        console.log('[AutoMode Event]', event);
+      }
 
       // Events include projectPath from backend - use it to look up project ID
       // Fall back to current projectId if not provided in event
@@ -100,7 +102,9 @@ export function useAutoMode() {
 
       // Skip event if we couldn't determine the project
       if (!eventProjectId) {
-        console.warn('[AutoMode] Could not determine project for event:', event);
+        if (import.meta.env.DEV) {
+          console.warn('[AutoMode] Could not determine project for event:', event);
+        }
         return;
       }
 
@@ -119,7 +123,14 @@ export function useAutoMode() {
         case 'auto_mode_feature_complete':
           // Feature completed - remove from running tasks and UI will reload features on its own
           if (event.featureId) {
-            console.log('[AutoMode] Feature completed:', event.featureId, 'passes:', event.passes);
+            if (import.meta.env.DEV) {
+              console.log(
+                '[AutoMode] Feature completed:',
+                event.featureId,
+                'passes:',
+                event.passes
+              );
+            }
             removeRunningTask(eventProjectId, event.featureId);
             addAutoModeActivity({
               featureId: event.featureId,
@@ -137,7 +148,9 @@ export function useAutoMode() {
             // Check if this is a user-initiated cancellation or abort (not a real error)
             if (event.errorType === 'cancellation' || event.errorType === 'abort') {
               // User cancelled/aborted the feature - just log as info, not an error
-              console.log('[AutoMode] Feature cancelled/aborted:', event.error);
+              if (import.meta.env.DEV) {
+                console.log('[AutoMode] Feature cancelled/aborted:', event.error);
+              }
               // Remove from running tasks
               if (eventProjectId) {
                 removeRunningTask(eventProjectId, event.featureId);
@@ -146,7 +159,9 @@ export function useAutoMode() {
             }
 
             // Real error - log and show to user
-            console.error('[AutoMode Error]', event.error);
+            if (import.meta.env.DEV) {
+              console.error('[AutoMode Error]', event.error);
+            }
 
             // Check for authentication errors and provide a more helpful message
             const isAuthError =
@@ -198,7 +213,9 @@ export function useAutoMode() {
         case 'auto_mode_phase':
           // Log phase transitions (Planning, Action, Verification)
           if (event.featureId && event.phase && event.message) {
-            console.log(`[AutoMode] Phase: ${event.phase} for ${event.featureId}`);
+            if (import.meta.env.DEV) {
+              console.log(`[AutoMode] Phase: ${event.phase} for ${event.featureId}`);
+            }
             addAutoModeActivity({
               featureId: event.featureId,
               type: event.phase,
@@ -211,7 +228,9 @@ export function useAutoMode() {
         case 'plan_approval_required':
           // Plan requires user approval before proceeding
           if (isPlanApprovalEvent(event)) {
-            console.log(`[AutoMode] Plan approval required for ${event.featureId}`);
+            if (import.meta.env.DEV) {
+              console.log(`[AutoMode] Plan approval required for ${event.featureId}`);
+            }
             setPendingPlanApproval({
               featureId: event.featureId,
               projectPath: event.projectPath || currentProject?.path || '',
@@ -224,7 +243,9 @@ export function useAutoMode() {
         case 'planning_started':
           // Log when planning phase begins
           if (event.featureId && event.mode && event.message) {
-            console.log(`[AutoMode] Planning started (${event.mode}) for ${event.featureId}`);
+            if (import.meta.env.DEV) {
+              console.log(`[AutoMode] Planning started (${event.mode}) for ${event.featureId}`);
+            }
             addAutoModeActivity({
               featureId: event.featureId,
               type: 'planning',
@@ -237,7 +258,9 @@ export function useAutoMode() {
         case 'plan_approved':
           // Log when plan is approved by user
           if (event.featureId) {
-            console.log(`[AutoMode] Plan approved for ${event.featureId}`);
+            if (import.meta.env.DEV) {
+              console.log(`[AutoMode] Plan approved for ${event.featureId}`);
+            }
             addAutoModeActivity({
               featureId: event.featureId,
               type: 'action',
@@ -252,7 +275,9 @@ export function useAutoMode() {
         case 'plan_auto_approved':
           // Log when plan is auto-approved (requirePlanApproval=false)
           if (event.featureId) {
-            console.log(`[AutoMode] Plan auto-approved for ${event.featureId}`);
+            if (import.meta.env.DEV) {
+              console.log(`[AutoMode] Plan auto-approved for ${event.featureId}`);
+            }
             addAutoModeActivity({
               featureId: event.featureId,
               type: 'action',
@@ -269,9 +294,11 @@ export function useAutoMode() {
               AutoModeEvent,
               { type: 'plan_revision_requested' }
             >;
-            console.log(
-              `[AutoMode] Plan revision requested for ${event.featureId} (v${revisionEvent.planVersion})`
-            );
+            if (import.meta.env.DEV) {
+              console.log(
+                `[AutoMode] Plan revision requested for ${event.featureId} (v${revisionEvent.planVersion})`
+              );
+            }
             addAutoModeActivity({
               featureId: event.featureId,
               type: 'planning',
@@ -285,9 +312,11 @@ export function useAutoMode() {
           // Task started - show which task is being worked on
           if (event.featureId && 'taskId' in event && 'taskDescription' in event) {
             const taskEvent = event as Extract<AutoModeEvent, { type: 'auto_mode_task_started' }>;
-            console.log(
-              `[AutoMode] Task ${taskEvent.taskId} started for ${event.featureId}: ${taskEvent.taskDescription}`
-            );
+            if (import.meta.env.DEV) {
+              console.log(
+                `[AutoMode] Task ${taskEvent.taskId} started for ${event.featureId}: ${taskEvent.taskDescription}`
+              );
+            }
             addAutoModeActivity({
               featureId: event.featureId,
               type: 'progress',
@@ -300,9 +329,11 @@ export function useAutoMode() {
           // Task completed - show progress
           if (event.featureId && 'taskId' in event) {
             const taskEvent = event as Extract<AutoModeEvent, { type: 'auto_mode_task_complete' }>;
-            console.log(
-              `[AutoMode] Task ${taskEvent.taskId} completed for ${event.featureId} (${taskEvent.tasksCompleted}/${taskEvent.tasksTotal})`
-            );
+            if (import.meta.env.DEV) {
+              console.log(
+                `[AutoMode] Task ${taskEvent.taskId} completed for ${event.featureId} (${taskEvent.tasksCompleted}/${taskEvent.tasksTotal})`
+              );
+            }
             addAutoModeActivity({
               featureId: event.featureId,
               type: 'progress',
@@ -318,9 +349,11 @@ export function useAutoMode() {
               AutoModeEvent,
               { type: 'auto_mode_phase_complete' }
             >;
-            console.log(
-              `[AutoMode] Phase ${phaseEvent.phaseNumber} completed for ${event.featureId}`
-            );
+            if (import.meta.env.DEV) {
+              console.log(
+                `[AutoMode] Phase ${phaseEvent.phaseNumber} completed for ${event.featureId}`
+              );
+            }
             addAutoModeActivity({
               featureId: event.featureId,
               type: 'action',
@@ -337,7 +370,12 @@ export function useAutoMode() {
               AutoModeEvent,
               { type: 'auto_mode_wizard_question' }
             >;
-            console.log(`[AutoMode] Wizard question for ${event.featureId}:`, wizardEvent.question);
+            if (import.meta.env.DEV) {
+              console.log(
+                `[AutoMode] Wizard question for ${event.featureId}:`,
+                wizardEvent.question
+              );
+            }
             setWizardQuestion({
               question: wizardEvent.question,
               featureId: wizardEvent.featureId,
@@ -357,7 +395,9 @@ export function useAutoMode() {
         case 'auto_mode_wizard_complete':
           // Wizard phase completed
           if (event.featureId) {
-            console.log(`[AutoMode] Wizard completed for ${event.featureId}`);
+            if (import.meta.env.DEV) {
+              console.log(`[AutoMode] Wizard completed for ${event.featureId}`);
+            }
             setWizardQuestion(null);
             setIsWizardModalOpen(false);
             addAutoModeActivity({
@@ -384,18 +424,24 @@ export function useAutoMode() {
   // Start auto mode - UI only, feature pickup is handled in board-view.tsx
   const start = useCallback(() => {
     if (!currentProject) {
-      console.error('No project selected');
+      if (import.meta.env.DEV) {
+        console.error('No project selected');
+      }
       return;
     }
 
     setAutoModeRunning(currentProject.id, true);
-    console.log(`[AutoMode] Started with maxConcurrency: ${maxConcurrency}`);
+    if (import.meta.env.DEV) {
+      console.log(`[AutoMode] Started with maxConcurrency: ${maxConcurrency}`);
+    }
   }, [currentProject, setAutoModeRunning, maxConcurrency]);
 
   // Stop auto mode - UI only, running tasks continue until natural completion
   const stop = useCallback(() => {
     if (!currentProject) {
-      console.error('No project selected');
+      if (import.meta.env.DEV) {
+        console.error('No project selected');
+      }
       return;
     }
 
@@ -404,14 +450,18 @@ export function useAutoMode() {
     // Stopping auto mode only turns off the toggle to prevent new features
     // from being picked up. Running tasks will complete naturally and be
     // removed via the auto_mode_feature_complete event.
-    console.log('[AutoMode] Stopped - running tasks will continue');
+    if (import.meta.env.DEV) {
+      console.log('[AutoMode] Stopped - running tasks will continue');
+    }
   }, [currentProject, setAutoModeRunning]);
 
   // Stop a specific feature
   const stopFeature = useCallback(
     async (featureId: string) => {
       if (!currentProject) {
-        console.error('No project selected');
+        if (import.meta.env.DEV) {
+          console.error('No project selected');
+        }
         return;
       }
 
@@ -425,7 +475,9 @@ export function useAutoMode() {
 
         if (result.success) {
           removeRunningTask(currentProject.id, featureId);
-          console.log('[AutoMode] Feature stopped successfully:', featureId);
+          if (import.meta.env.DEV) {
+            console.log('[AutoMode] Feature stopped successfully:', featureId);
+          }
           addAutoModeActivity({
             featureId,
             type: 'complete',
@@ -433,11 +485,15 @@ export function useAutoMode() {
             passes: false,
           });
         } else {
-          console.error('[AutoMode] Failed to stop feature:', result.error);
+          if (import.meta.env.DEV) {
+            console.error('[AutoMode] Failed to stop feature:', result.error);
+          }
           throw new Error(result.error || 'Failed to stop feature');
         }
       } catch (error) {
-        console.error('[AutoMode] Error stopping feature:', error);
+        if (import.meta.env.DEV) {
+          console.error('[AutoMode] Error stopping feature:', error);
+        }
         throw error;
       }
     },
@@ -463,7 +519,9 @@ export function useAutoMode() {
         );
         // Modal will close when next question or wizard_complete event arrives
       } catch (error) {
-        console.error('[useAutoMode] Failed to submit wizard answer:', error);
+        if (import.meta.env.DEV) {
+          console.error('[useAutoMode] Failed to submit wizard answer:', error);
+        }
         throw error;
       }
     },

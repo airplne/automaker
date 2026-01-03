@@ -62,7 +62,7 @@ test.describe('AI Profiles', () => {
     await dialog.locator('[id="agent-bmad:technologist-architect"]').click();
     await dialog.locator('[id="agent-bmad:fulfillization-manager"]').click();
     await dialog.locator('[id="agent-bmad:security-guardian"]').click();
-    await dialog.locator('[id="agent-bmad:analyst-strategist"]').click();
+    await dialog.locator('[id="agent-bmad:analyst"]').click();
 
     // Verify counter shows 5/10 max
     await expect(dialog.locator('text=/\\(5\\/10 max\\)/')).toBeVisible();

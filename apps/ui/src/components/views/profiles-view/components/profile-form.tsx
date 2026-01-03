@@ -20,7 +20,11 @@ import {
 } from '@/components/ui/select';
 import { CLAUDE_MODELS, THINKING_LEVELS, ICON_OPTIONS } from '../constants';
 import { getProviderFromModel } from '../utils';
-import { MAX_EXECUTIVE_AGENTS, ALL_EXECUTIVE_AGENT_IDS } from '@/config/bmad-agents';
+import { ALL_BMAD_AGENT_IDS } from '@/config/bmad-agents';
+
+// Use ALL_BMAD_AGENT_IDS for full access to all agents (dynamically counted)
+// Legacy MAX_EXECUTIVE_AGENTS removed - no selection limit
+const MAX_AGENTS = ALL_BMAD_AGENT_IDS.length; // Currently 29 agents
 
 interface ProfileFormProps {
   profile: Partial<AIProfile>;
@@ -66,7 +70,7 @@ export function ProfileForm({
       const next = new Set(prev);
       if (next.has(agentId)) {
         next.delete(agentId);
-      } else if (next.size < MAX_EXECUTIVE_AGENTS) {
+      } else if (next.size < MAX_AGENTS) {
         next.add(agentId);
       }
       return next;
@@ -175,7 +179,7 @@ export function ProfileForm({
               <Users className="w-4 h-4 text-muted-foreground" />
               <Label>Default BMAD Agents</Label>
               <span className="text-xs text-muted-foreground">
-                ({selectedAgentIds.size}/{MAX_EXECUTIVE_AGENTS} max)
+                ({selectedAgentIds.size}/{MAX_AGENTS} max)
               </span>
             </div>
             {selectedAgentIds.size > 0 && (
@@ -198,17 +202,15 @@ export function ProfileForm({
             <div className="text-sm text-muted-foreground">Loading agents...</div>
           ) : bmadPersonas.length > 0 ? (
             <div className="space-y-1 max-h-[200px] overflow-y-auto border rounded-lg p-2 bg-muted/20">
-              {/* BMM Executive Agents */}
+              {/* All BMAD Agents (29 total across 5 modules) */}
               <div className="text-xs font-medium text-muted-foreground px-2 py-1">
-                BMM Executive Agents
+                All BMAD Agents
               </div>
-              {ALL_EXECUTIVE_AGENT_IDS.map((id) =>
-                bmadPersonas.find((persona) => persona.id === id)
-              )
+              {ALL_BMAD_AGENT_IDS.map((id) => bmadPersonas.find((persona) => persona.id === id))
                 .filter((agent): agent is NonNullable<typeof agent> => agent !== undefined)
                 .map((agent) => {
                   const isSelected = selectedAgentIds.has(agent.id);
-                  const isDisabled = !isSelected && selectedAgentIds.size >= MAX_EXECUTIVE_AGENTS;
+                  const isDisabled = !isSelected && selectedAgentIds.size >= MAX_AGENTS;
                   return (
                     <div
                       key={agent.id}

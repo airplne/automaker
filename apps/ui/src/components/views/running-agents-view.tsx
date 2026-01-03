@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Bot, Folder, Loader2, RefreshCw, Square, Activity, FileText } from 'lucide-react';
 import { getElectronAPI, RunningAgent } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
@@ -32,19 +32,25 @@ export function RunningAgentsView() {
     }
   }, []);
 
+  // Use ref to store latest fetch function for interval
+  const fetchRunningAgentsRef = useRef(fetchRunningAgents);
+  useEffect(() => {
+    fetchRunningAgentsRef.current = fetchRunningAgents;
+  }, [fetchRunningAgents]);
+
   // Initial fetch
   useEffect(() => {
     fetchRunningAgents();
   }, [fetchRunningAgents]);
 
-  // Auto-refresh every 2 seconds
+  // Auto-refresh every 2 seconds - only create interval once
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchRunningAgents();
+      fetchRunningAgentsRef.current();
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [fetchRunningAgents]);
+  }, []); // Empty deps - interval created only once
 
   // Subscribe to auto-mode events to update in real-time
   useEffect(() => {

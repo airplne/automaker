@@ -38,6 +38,8 @@ interface PlanningModeSelectorProps {
   featureDescription?: string; // For auto-generation context
   testIdPrefix?: string;
   compact?: boolean; // For use in dialogs vs settings
+  agentCount?: number; // Number of selected agents for singular/plural text
+  usePartyMode?: boolean; // Whether Party Mode is enabled
 }
 
 const modes = [
@@ -106,6 +108,8 @@ export function PlanningModeSelector({
   featureDescription,
   testIdPrefix = 'planning',
   compact = false,
+  agentCount,
+  usePartyMode,
 }: PlanningModeSelectorProps) {
   const [showPreview, setShowPreview] = useState(false);
   const selectedMode = modes.find((m) => m.value === mode);
@@ -150,18 +154,21 @@ export function PlanningModeSelector({
         {modes.map((m) => {
           const isSelected = mode === m.value;
           const Icon = m.icon;
+          const isSkipDisabled = usePartyMode && m.value === 'skip';
           return (
             <button
               key={m.value}
               type="button"
               onClick={() => onModeChange(m.value)}
+              disabled={isSkipDisabled}
               data-testid={`${testIdPrefix}-mode-${m.value}`}
               className={cn(
                 'flex flex-col items-center gap-2 p-3 rounded-xl cursor-pointer transition-all duration-200',
                 'border-2 hover:border-primary/50',
                 isSelected
                   ? cn('border-primary', m.bgColor)
-                  : 'border-border/50 bg-card/50 hover:bg-accent/30'
+                  : 'border-border/50 bg-card/50 hover:bg-accent/30',
+                isSkipDisabled && 'opacity-50 cursor-not-allowed'
               )}
             >
               <div
@@ -354,9 +361,11 @@ export function PlanningModeSelector({
       {!requiresApproval && (
         <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3">
           {mode === 'skip'
-            ? 'The agent will start implementing immediately without creating a plan or spec.'
-            : mode === 'wizard'
-              ? 'The agent will ask you clarifying questions to understand requirements before planning.'
+            ? agentCount && agentCount > 1
+              ? 'The agents will collaborate to implement immediately without creating a plan or spec.'
+              : 'The agent will start implementing immediately without creating a plan or spec.'
+            : agentCount && agentCount > 1
+              ? "The agents will collaboratively create a planning outline before implementing, but won't wait for approval."
               : "The agent will create a planning outline before implementing, but won't wait for approval."}
         </p>
       )}
